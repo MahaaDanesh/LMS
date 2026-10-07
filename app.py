@@ -737,7 +737,7 @@ def register_role(role):
 
             if role == "trainer":
                 trainer_item={"id":next_id(TRAINERS),"name":name,"email":email,"phone":"","specialization":"","experience":0,"status":"Active","institution_id":iid}
-                con.execute("INSERT INTO records(entity,id,payload) VALUES(?,?,?)",("trainers",trainer_item["id"],json.dumps(trainer_item)))
+                con.execute("INSERT INTO records(entity,id,institution_id,payload) VALUES(%s,%s,%s,%s::jsonb)", ("trainers", trainer_item["id"], iid, json.dumps(trainer_item)))
 
             elif role == "student":
                 phone=request.form.get("phone","").strip()
@@ -757,9 +757,9 @@ def register_role(role):
                     gid=next_id(GUARDIANS)
                     guardian_item={"id":gid,"name":guardian_name,"relation":guardian_relation,"phone":guardian_phone,"student_id":student_item["id"],"address":guardian_address,"institution_id":iid}
                     student_item["guardian_id"]=gid
-                    con.execute("INSERT INTO records(entity,id,payload) VALUES(?,?,?)",("guardians",gid,json.dumps(guardian_item)))
+                    con.execute("INSERT INTO records(entity,id,institution_id,payload) VALUES(%s,%s,%s,%s::jsonb)", ("guardians", gid, iid, json.dumps(guardian_item)))
 
-                con.execute("INSERT INTO records(entity,id,payload) VALUES(?,?,?)",("students",student_item["id"],json.dumps(student_item)))
+                con.execute("INSERT INTO records(entity,id,institution_id,payload) VALUES(%s,%s,%s,%s::jsonb)", ("students", student_item["id"], iid, json.dumps(student_item)))
 
             con.commit()
 
@@ -772,12 +772,8 @@ def register_role(role):
 
         except Exception as e:
             con.rollback()
-            flash("Account could not be created because the username, email, or institute code already exists.","error")
-            return render_template("register_role.html", role=role, role_label=labels[role])
-        except Exception as e:
-            con.rollback()
-            print("Registration error:",repr(e))
-            flash("Account could not be created. Please verify the details and try again.","error")
+            print("Registration error:", repr(e))
+            flash("Account could not be created. Please verify the details and try again.", "error")
             return render_template("register_role.html", role=role, role_label=labels[role])
         finally:
             con.close()
