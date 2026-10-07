@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Students{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block page_crumb %}Manage student records, enrollment and status{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-user-graduate"></i>&nbsp; All Students <span class="badge badge-blue">{{ students|length }}</span></h3>
+    <div class="page-actions">
+      {% if session.get('user_role') == 'admin' %}<button class="btn btn-primary" onclick="openAddStudentModal()"><i class="fa-solid fa-plus"></i> Add Student</button>{% endif %}
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search students by name, email..." data-search-for="studentsTable" oninput="applyFilters('studentsTable')">
+    </div>
+    <select class="filter-select" data-filter-for="studentsTable" data-field="course" onchange="applyFilters('studentsTable')">
+      <option value="">All Courses</option>
+      {% for c in courses %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}
+    </select>
+    <select class="filter-select" data-filter-for="studentsTable" data-field="status" onchange="applyFilters('studentsTable')">
+      <option value="">All Status</option>
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="studentsTable">
+      <thead>
+        <tr><th>Student</th><th>Email</th><th>Phone</th><th>Enrolled Courses</th><th>Batch</th><th>Enrolled On</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr data-row data-id="{{ s.id }}" data-entity="students" data-status="{{ s.status }}" data-course="{{ student_course_names(s)|join(', ') }}">
+          <td class="cell-strong">{{ s.name }}</td>
+          <td>{{ s.email }}</td>
+          <td>{{ s.phone }}</td>
+          <td><div class="course-tags">{% for cname in student_course_names(s) %}<span class="badge badge-blue" style="margin:2px 4px 2px 0;display:inline-block;">{{ cname }}</span>{% endfor %}{% if not student_course_names(s) %}—{% endif %}</div></td>
+          <td>{{ batch_name(s.batch_id) }}</td>
+          <td class="cell-muted">{{ s.enrollment_date }}</td>
+          <td><span class="badge {{ 'badge-green' if s.status=='Active' else 'badge-gray' }}">{{ s.status }}</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="action-btn edit" title="Edit" onclick='openEditStudentModal({{ s|tojson }})'><i class="fa-solid fa-pen"></i></button>
+              <button class="action-btn delete" title="Delete" onclick="confirmDelete('students', {{ s.id }}, '{{ s.name|e }}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        <tr class="empty-row" style="display:none;"><td colspan="8">No students match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="studentModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="studentModalTitle">Add Student</h3>
+      <button class="modal-close" onclick="closeModal('studentModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="studentForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="full form-group">
+            <label>Full Name</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" name="phone" class="form-control" required>
+          </div>
+          <div class="full form-group">
+            <label>Enrolled Courses</label>
+            <select name="course_ids" id="studentCourseIds" class="form-control" multiple size="5" required>
+              {% for c in courses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+            <small class="form-help">Hold Ctrl (Windows) / Command (Mac) to select multiple courses.</small>
+          </div>
+          <div class="form-group">
+            <label>Batch</label>
+            <select name="batch_id" class="form-control" required>
+              {% for b in batches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Enrollment Date</label>
+            <input type="date" name="enrollment_date" class="form-control" required>
+          </div>
+          <div class="full form-group"><label>Parent / Guardian Name</label><input name="guardian_name" class="form-control" required></div>
+          <div class="form-group"><label>Relation</label><select name="guardian_relation" class="form-control"><option>Father</option><option>Mother</option><option>Guardian</option></select></div>
+          <div class="form-group"><label>Guardian Phone</label><input name="guardian_phone" class="form-control" required></div>
+          
+          <div class="full form-group"><label>Guardian Address</label><textarea name="guardian_address" class="form-control" rows="2"></textarea></div>
+          <div class="full form-group">
+            <label>Status</label>
+            <select name="status" class="form-control" required>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('studentModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Student</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var studentEditId = null;
+function openAddStudentModal(){
+  studentEditId = null;
+  document.getElementById('studentModalTitle').innerText = 'Add Student';
+  document.getElementById('studentForm').reset();
+  openModal('studentModal');
+}
+function openEditStudentModal(student){
+  studentEditId = student.id;
+  document.getElementById('studentModalTitle').innerText = 'Edit Student';
+  document.getElementById('studentForm').reset();
+  prefillForm('studentForm', student);
+  var guardian = ({{ guardians|tojson }}).find(function(g){return g.id === student.guardian_id;});
+  if(guardian){ document.querySelector('[name=guardian_name]').value=guardian.name||''; document.querySelector('[name=guardian_relation]').value=guardian.relation||'Guardian'; document.querySelector('[name=guardian_phone]').value=guardian.phone||''; document.querySelector('[name=guardian_address]').value=guardian.address||''; }
+  var ids = student.course_ids || (student.course_id ? [student.course_id] : []);
+  Array.from(document.getElementById('studentCourseIds').options).forEach(function(opt){
+    opt.selected = ids.map(String).indexOf(String(opt.value)) !== -1;
+  });
+  openModal('studentModal');
+}
+document.getElementById('studentForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  var form = this;
+  var payload = {};
+  new FormData(form).forEach(function(value,key){ if(key !== 'course_ids') payload[key]=value; });
+  payload.course_ids = Array.from(document.getElementById('studentCourseIds').selectedOptions).map(function(o){ return parseInt(o.value); });
+  if(!payload.course_ids.length){ showToast('Select at least one course', 'error'); return; }
+  payload.course_id = payload.course_ids[0];
+  var url = '/api/data/students' + (studentEditId ? '/' + studentEditId : '');
+  fetch(url,{method:studentEditId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(res){return res.json().then(function(data){return {status:res.status,data:data};});})
+    .then(function(result){
+      if(result.status===200 || result.status===201){ showToast(result.data.message || 'Student saved','success'); setTimeout(function(){location.reload();},600); }
+      else showToast(result.data.error || 'Something went wrong','error');
+    }).catch(function(){showToast('Network error. Please try again.','error');});
+});
+if(new URLSearchParams(location.search).get('open')==='add'){setTimeout(openAddStudentModal,150);}
+</script>
+{% endblock %}

@@ -1,0 +1,29 @@
+MY INSTITUTE LMS - COMPLETE WORKING SOURCE
+
+1. Install Python 3.10+.
+2. Open Command Prompt/PowerShell in this folder.
+3. Create environment:
+   python -m venv venv
+4. Activate it:
+   Windows PowerShell: .\venv\Scripts\Activate.ps1
+   Windows CMD:        venv\Scripts\activate
+5. Install packages:
+   pip install -r requirements.txt
+6. Start:
+   python app.py
+7. Open:
+   http://127.0.0.1:5000
+
+LOGIN
+Admin:   admin@myinstitute.edu / admin123
+Trainer: trainer@myinstitute.edu / trainer123
+Student: student@myinstitute.edu / student123
+
+IMPORTANT
+The application creates lms.db automatically on first run. It uses SQLite for persistent users and application records.
+If an old lms.db from a previous build causes stale seed data, stop the app, delete lms.db, and start again.
+
+ROLE SCOPING
+Student: own course, own attendance, own assessment/batch assessment, own payment, own report, own sessions/recordings.
+Trainer: assigned courses/batches/students/guardians/attendance/assessments/materials/sessions/recordings.
+Admin: institute-wide management.

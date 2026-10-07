@@ -1,0 +1,13 @@
+LMS Product Update
+
+- Admin Home is now a real management home page; dashboard no longer contains the management card.
+- Removed standalone Batch management from Admin Home. Batch remains embedded in Course creation/editing.
+- Admin Home includes Add/View shortcuts for Course, Trainer, Students, Sessions, Announcements & Materials, Assessment, Report, Parents/Guardians and Payments.
+- Admin and Trainer can add session recording URLs from Live Sessions.
+- Student recommendations now show other active courses from the same institute even after the student already has enrollments.
+- Enrollment flow validates course, batch, capacity and payment link and then records payment + enrollment + batch.
+- Student enrollment table shows Course, Batch and Trainer.
+- Create Account no longer has a role dropdown. Separate registration flows are provided for Admin, Trainer and Student.
+- Guardian email field was removed from registration and student/guardian management.
+- Added light/dark mode toggle with dark-mode theme variables.
+- Added language selector with multiple languages and whole-page translation support through Google Translate.

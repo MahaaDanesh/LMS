@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Live Class{% endblock %}
+{% block page_title %}Live Class{% endblock %}
+{% block page_crumb %}{{ live_session.topic }} · Attendance is tracked automatically{% endblock %}
+{% block content %}
+<div class="card live-class-card">
+  <div class="card-header">
+    <div>
+      <h3><i class="fa-solid fa-video"></i> {{ live_session.topic }}</h3>
+      <div class="cell-muted">{{ live_session.date }} · {{ live_session.time }} · {{ live_session.duration }}</div>
+    </div>
+    <span class="badge badge-blue" id="attendanceStatus">Connecting…</span>
+  </div>
+  <div class="live-attendance-notice">
+    <i class="fa-solid fa-circle-info"></i>
+    <div><strong>Attendance requirement</strong><br>Stay actively connected to this live class for at least <strong>75%</strong> of the scheduled duration to receive attendance.</div>
+  </div>
+  <div class="live-progress-box">
+    <div class="live-progress-top"><span>Active connection time</span><strong id="timeText">0 / {{ duration_minutes }} min</strong></div>
+    <div class="progress-track"><div class="progress-fill" id="liveProgress" style="width:0%"></div></div>
+    <div class="live-progress-bottom"><span>Required: {{ (duration_minutes * 0.75)|round(1) }} min</span><span id="percentText">0%</span></div>
+  </div>
+  <div id="jitsiContainer" style="height:70vh;min-height:520px;border-radius:14px;overflow:hidden;background:#0b1220;"></div>
+  <div class="page-actions" style="margin-top:14px;justify-content:space-between;">
+    <a class="btn btn-outline" href="{{ url_for('sessions_page') }}"><i class="fa-solid fa-arrow-left"></i> Back to Sessions</a>
+    <button class="btn btn-danger" type="button" onclick="leaveClass()"><i class="fa-solid fa-right-from-bracket"></i> Leave Class</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://meet.jit.si/external_api.js"></script>
+<script>
+const sessionId={{ live_session.id }};
+const durationMinutes={{ duration_minutes }};
+let api=null, heartbeatTimer=null, joined=false, leaving=false;
+function post(url, body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(r=>r.json());}
+function setStatus(text, cls){const el=document.getElementById('attendanceStatus');el.textContent=text;el.className='badge '+(cls||'badge-blue');}
+function updateProgress(d){
+  const pct=Math.min(100, Number(d.percent||0));
+  document.getElementById('liveProgress').style.width=pct+'%';
+  document.getElementById('percentText').textContent=pct+'%';
+  document.getElementById('timeText').textContent=(d.active_minutes||0)+' / '+durationMinutes+' min';
+  if(d.eligible) setStatus('Attendance eligible','badge-green');
+}
+function heartbeat(){
+  const active=joined && document.visibilityState==='visible' && !leaving;
+  post('/api/live-session/'+sessionId+'/heartbeat',{active:active}).then(d=>{if(d.ok){updateProgress(d);if(d.completed){setStatus(d.eligible?'Attendance recorded':'Attendance not granted',''+(d.eligible?'badge-green':'badge-red'));clearInterval(heartbeatTimer);}}});
+}
+function leaveClass(){
+  if(leaving)return; leaving=true;
+  post('/api/live-session/'+sessionId+'/leave',{}).finally(()=>{if(heartbeatTimer)clearInterval(heartbeatTimer);window.location.href='{{ url_for("sessions_page") }}';});
+}
+window.addEventListener('beforeunload',()=>{if(!leaving){navigator.sendBeacon('/api/live-session/'+sessionId+'/leave',new Blob(['{}'],{type:'application/json'}));}});
+document.addEventListener('visibilitychange',()=>{if(joined) heartbeat();});
+post('/api/live-session/'+sessionId+'/join',{}).then(d=>{
+  if(!d.ok){setStatus(d.error||'Unable to join','badge-red');return;}
+  const room=(d.meeting_link||'').split('/').pop() || ('LMS-'+sessionId);
+  api=new JitsiMeetExternalAPI('meet.jit.si',{roomName:room,parentNode:document.getElementById('jitsiContainer'),width:'100%',height:'100%',configOverwrite:{prejoinPageEnabled:true},interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['microphone','camera','desktop','chat','raisehand','tileview','fullscreen','hangup']}});
+  api.addEventListener('videoConferenceJoined',()=>{joined=true;setStatus('Live · Attendance tracking','badge-blue');heartbeatTimer=setInterval(heartbeat,10000);heartbeat();});
+  api.addEventListener('videoConferenceLeft',()=>{joined=false;post('/api/live-session/'+sessionId+'/leave',{}).then(d=>{if(d.ok)updateProgress(d);});});
+  api.addEventListener('readyToClose',()=>{if(!leaving)leaveClass();});
+}).catch(()=>setStatus('Unable to connect to live class','badge-red'));
+</script>
+{% endblock %}

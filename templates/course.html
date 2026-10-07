@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Courses{% endblock %}
+{% block page_title %}Courses{% endblock %}
+{% block page_crumb %}{% if student_view %}Your enrolled courses{% else %}Manage courses offered by your institute{% endif %}{% endblock %}
+{% block content %}
+{% if student_view %}
+<div class="card">
+  <div class="card-header"><h3><i class="fa-solid fa-compass"></i> Recommended Courses</h3><span class="badge badge-blue">{{ available_courses|length }} available</span></div>
+  <div class="card-body">
+    <p class="cell-muted" style="margin-bottom:18px;">Explore other courses offered by your institute and enroll with your preferred batch.</p>
+    <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+      {% for c in available_courses %}
+      <div class="card report-card" style="margin:0;">
+        <div class="card-body">
+          <div class="r-top"><div class="mini-ic"><i class="fa-solid fa-book-open"></i></div><span class="badge badge-green">{{ c.status }}</span></div>
+          <h3 style="margin:12px 0 5px;">{{ c.name }}</h3>
+          <div class="cell-muted">{{ c.category }} · {{ c.duration }}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--navy-900);margin:12px 0;">₹{{ '{:,}'.format(c.fee) }}</div>
+          <p class="cell-muted" style="min-height:40px;">{{ c.description }}</p>
+          <button type="button" class="btn btn-primary btn-block enroll-trigger" data-course='{{ c|tojson|forceescape }}'><i class="fa-solid fa-user-plus"></i> Enroll</button>
+        </div>
+      </div>
+      {% else %}<div class="empty-state">No active courses are available right now.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:18px;">
+  <div class="card-header"><h3><i class="fa-solid fa-circle-check"></i> Your Enrollments</h3></div>
+  <div class="table-wrap"><table class="data-table"><thead><tr><th>Course</th><th>Batch</th><th>Trainer</th><th>Enrollment Date</th><th>Status</th></tr></thead><tbody>
+  {% for e in enrollments %}{% set ec = courses|selectattr('id','equalto',e.course_id)|list|first %}{% set eb = batches|selectattr('id','equalto',e.batch_id)|list|first %}{% if ec %}<tr><td class="cell-strong">{{ ec.name }}</td><td>{% if eb %}<strong>{{ eb.name }}</strong><div class="cell-muted">{{ eb.timing }}</div>{% else %}—{% endif %}</td><td>{% if eb %}{{ trainer_name(eb.trainer_id) }}{% else %}—{% endif %}</td><td>{{ e.enrollment_date or '—' }}</td><td><span class="badge badge-green">{{ e.status or 'Active' }}</span></td></tr>{% endif %}{% endfor %}
+  </tbody></table></div>
+</div>
+{% endif %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-book"></i>&nbsp; {% if student_view %}My Courses{% else %}All Courses{% endif %} <span class="badge badge-blue">{{ courses|length }}</span></h3>
+    {% if session.get('user_role') == 'admin' %}<button class="btn btn-primary" onclick="openAddCourseModal()"><i class="fa-solid fa-plus"></i> Add Course</button>{% endif %}
+  </div>
+  <div class="toolbar">
+    <div class="search-box"><i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i><input type="text" placeholder="Search courses by name or code..." data-search-for="coursesTable" oninput="applyFilters('coursesTable')"></div>
+    {% if not student_view %}<select class="filter-select" data-filter-for="coursesTable" data-field="status" onchange="applyFilters('coursesTable')"><option value="">All Status</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select>{% endif %}
+  </div>
+  <div class="table-wrap"><table class="data-table" id="coursesTable"><thead><tr><th>Course</th><th>Code</th><th>Category</th><th>Duration</th><th>Fee</th><th>Batch</th><th>Payment Link</th><th>Status</th>{% if not student_view and session.get('user_role')=='admin' %}<th>Actions</th>{% endif %}</tr></thead><tbody>
+  {% for c in courses %}<tr data-row data-id="{{ c.id }}" data-entity="courses" data-status="{{ c.status }}"><td class="cell-strong">{{ c.name }}</td><td>{{ c.code }}</td><td>{{ c.category }}</td><td>{{ c.duration }}</td><td>₹{{ '{:,}'.format(c.fee) }}</td><td>{% set cb = (batches|selectattr('course_id','equalto',c.id)|list|first) %}{% if cb %}<strong>{{ cb.name }}</strong><div class="cell-muted">{{ cb.timing }} · {{ cb.start_date }}</div>{% else %}<span class="cell-muted">No batch</span>{% endif %}</td><td>{% if c.payment_link %}<a href="{{ c.payment_link }}" target="_blank" class="btn btn-outline btn-sm">Pay Link</a>{% else %}<span class="cell-muted">Not added</span>{% endif %}</td><td><span class="badge {{ 'badge-green' if c.status=='Active' else 'badge-gray' }}">{{ c.status }}</span></td>{% if not student_view and session.get('user_role')=='admin' %}<td><div class="row-actions"><button class="action-btn edit" title="Edit" onclick='openEditCourseModal({{ c|tojson }})'><i class="fa-solid fa-pen"></i></button><button class="action-btn delete" title="Delete" onclick="confirmDelete('courses',{{c.id}},'{{c.name|e}}')"><i class="fa-solid fa-trash"></i></button></div></td>{% endif %}</tr>
+  {% else %}<tr><td colspan="9" class="empty-state">No courses found.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+
+{% if not student_view and session.get('user_role')=='admin' %}
+<div class="modal-overlay" id="courseModal"><div class="modal-box"><div class="modal-header"><h3 id="courseModalTitle">Add Course</h3><button class="modal-close" onclick="closeModal('courseModal')"><i class="fa-solid fa-xmark"></i></button></div><form id="courseForm"><div class="modal-body"><div class="form-grid">
+<div class="full form-group"><label>Course Name</label><input name="name" class="form-control" required></div>
+<div class="form-group"><label>Course Code</label><input name="code" class="form-control" required></div>
+<div class="form-group"><label>Category</label><input name="category" class="form-control" required></div>
+<div class="form-group"><label>Duration</label><input name="duration" class="form-control" placeholder="e.g. 6 Months" required></div>
+<div class="form-group"><label>Total Fees (₹)</label><input type="number" name="fee" class="form-control" min="0" required></div>
+<div class="form-group"><label>Payment Link</label><input type="url" name="payment_link" class="form-control" placeholder="Razorpay / Stripe / UPI / other link"></div>
+<div class="full" style="margin-top:8px;padding:14px;border:1px solid var(--gray-200);border-radius:12px;background:var(--gray-50)"><h4 style="margin:0 0 12px;color:var(--navy-900)"><i class="fa-solid fa-layer-group"></i> Batch Details</h4><div class="form-grid">
+<div class="form-group"><label>Batch Name</label><input name="batch_name" class="form-control" placeholder="e.g. Morning Batch A" required></div>
+<div class="form-group"><label>Trainer</label><select name="batch_trainer_id" class="form-control" required><option value="">Select Trainer</option>{% for t in trainers %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select></div>
+<div class="form-group"><label>Start Date</label><input type="date" name="batch_start_date" class="form-control" required></div>
+<div class="form-group"><label>End Date</label><input type="date" name="batch_end_date" class="form-control" required></div>
+<div class="form-group"><label>Timing</label><input name="batch_timing" class="form-control" placeholder="e.g. 6:00 PM - 8:00 PM" required></div>
+<div class="form-group"><label>Capacity</label><input type="number" name="batch_capacity" class="form-control" min="1" required></div>
+<div class="form-group"><label>Batch Status</label><select name="batch_status" class="form-control"><option>Upcoming</option><option>Ongoing</option><option>Completed</option></select></div>
+</div></div>
+<div class="full form-group"><label>Status</label><select name="status" class="form-control"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+<div class="full form-group"><label>Description</label><textarea name="description" class="form-control" rows="3"></textarea></div>
+</div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('courseModal')">Cancel</button><button class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Course</button></div></form></div></div>
+{% endif %}
+
+{% if student_view and available_courses %}
+<div class="modal-overlay" id="enrollModal"><div class="modal-box"><div class="modal-header"><h3>Course Registration</h3><button class="modal-close" onclick="closeModal('enrollModal')"><i class="fa-solid fa-xmark"></i></button></div><div class="modal-body"><div id="enrollCourseInfo"></div><div class="form-group"><label>Select Batch</label><select id="enrollBatch" class="form-control"></select></div><div id="enrollPayment" style="margin-top:16px;padding:14px;background:var(--gray-50);border-radius:10px;"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('enrollModal')">Cancel</button><button type="button" class="btn btn-primary" id="enrollPaidBtn" onclick="completeEnrollment('Paid')"><i class="fa-solid fa-check"></i> I Have Completed Payment &amp; Enroll</button><button type="button" class="btn btn-danger" onclick="completeEnrollment('Failed')">Payment Failed</button></div></div></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+{% if not student_view and session.get('user_role')=='admin' %}
+var courseEditId=null;
+function openAddCourseModal(){courseEditId=null;document.getElementById('courseModalTitle').innerText='Add Course';document.getElementById('courseForm').reset();openModal('courseModal');}
+function openEditCourseModal(c){courseEditId=c.id;document.getElementById('courseModalTitle').innerText='Edit Course';document.getElementById('courseForm').reset();prefillForm('courseForm',c);var b=({{ batches|tojson }}).find(function(x){return Number(x.course_id)===Number(c.id);});if(b){prefillForm('courseForm',{batch_name:b.name,batch_trainer_id:b.trainer_id,batch_start_date:b.start_date,batch_end_date:b.end_date,batch_timing:b.timing,batch_capacity:b.capacity,batch_status:b.status});}openModal('courseModal');}
+document.getElementById('courseForm').addEventListener('submit',function(e){e.preventDefault();submitEntityForm('courses',courseEditId?'PUT':'POST',this,courseEditId);});
+{% endif %}
+{% if student_view and available_courses %}
+var selectedCourse=null;
+var allBatches={{ batches|tojson }};
+function escapeHtml(value){return String(value==null?'':value).replace(/[&<>'"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch];});}
+function openEnrollModal(c){
+  if(!c || !c.id){showToast('Unable to open this course. Please refresh and try again.','error');return;}
+  selectedCourse=c;
+  var info=document.getElementById('enrollCourseInfo');
+  var sel=document.getElementById('enrollBatch');
+  if(!info || !sel){showToast('Enrollment window could not be loaded. Please refresh the page.','error');return;}
+  info.innerHTML='<strong>'+escapeHtml(c.name)+'</strong><div class="cell-muted">Duration: '+escapeHtml(c.duration)+' · Total Fee: ₹'+Number(c.fee||0).toLocaleString('en-IN')+'</div>';
+  var bs=allBatches.filter(function(b){return Number(b.course_id)===Number(c.id) && b.status!=="Completed" && Number(b.enrolled||0)<Number(b.capacity||0);});
+  sel.innerHTML='';
+  bs.forEach(function(b){var o=document.createElement('option');o.value=b.id;o.textContent=b.name+' · '+b.timing+' · '+(b.enrolled||0)+'/'+(b.capacity||0);sel.appendChild(o);});
+  if(!bs.length){var empty=document.createElement('option');empty.value='';empty.textContent='No seats available';sel.appendChild(empty);}
+  var payment=document.getElementById('enrollPayment');
+  var hasLink=!!(c.payment_link && String(c.payment_link).trim());
+  var link=hasLink?'<a class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="'+escapeHtml(c.payment_link)+'">Open Payment Link</a>':'<span class="cell-muted">The institute has not added a payment link for this course yet. Please contact the institute admin.</span>';
+  payment.innerHTML='<div><strong>Payment required now</strong><div class="cell-muted" style="margin:5px 0 10px;">Pay the full course amount using the institute payment link. After payment, return here and confirm enrollment.</div>'+link+'</div>';
+  var paidBtn=document.getElementById('enrollPaidBtn');
+  if(paidBtn){paidBtn.disabled=!hasLink || !bs.length;paidBtn.title=!hasLink?'Payment link is not configured':(!bs.length?'No seats available':'');}
+  openModal('enrollModal');
+}
+function completeEnrollment(status){
+  if(!selectedCourse){showToast('Please select a course first.','error');return;}
+  var bid=document.getElementById('enrollBatch').value;
+  if(!bid){showToast('Please select an available batch first.','error');return;}
+  if(status==='Paid' && !selectedCourse.payment_link){showToast('This course does not have a payment link yet. Please contact the institute admin.','error');return;}
+  var paidBtn=document.getElementById('enrollPaidBtn');
+  if(paidBtn) paidBtn.disabled=true;
+  fetch('/api/enroll',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({course_id:Number(selectedCourse.id),batch_id:Number(bid),payment_status:status}),credentials:'same-origin'})
+  .then(function(r){return r.text().then(function(text){var d={};try{d=JSON.parse(text);}catch(e){d={error:text||'Unexpected server response'};}return {ok:r.ok,status:r.status,d:d};});})
+  .then(function(x){
+    if(x.ok){showToast(x.d.message||'Enrollment completed successfully.','success');closeModal('enrollModal');setTimeout(function(){window.location.href='{{ url_for("courses_page") }}';},700);}
+    else {showToast(x.d.error||('Enrollment failed (HTTP '+x.status+').'),'error');if(paidBtn)paidBtn.disabled=false;}
+  })
+  .catch(function(err){console.error(err);showToast('Unable to connect to the enrollment service. Please try again.','error');if(paidBtn)paidBtn.disabled=false;});
+}
+document.querySelectorAll('.enroll-trigger').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var raw=this.getAttribute('data-course');
+    try{openEnrollModal(JSON.parse(raw));}catch(e){console.error(e);showToast('Unable to load this course. Please refresh and try again.','error');}
+  });
+});
+{% endif %}
+{% if student_view and available_courses %}
+const requestedCourseId = new URLSearchParams(window.location.search).get('enroll');
+if (requestedCourseId) {
+  const requested = {{ available_courses|tojson }}.find(function(c){ return String(c.id) === String(requestedCourseId); });
+  if (requested) { setTimeout(function(){ openEnrollModal(requested); }, 150); }
+}
+{% endif %}
+if(new URLSearchParams(location.search).get('open')==='add'){setTimeout(openAddCourseModal,150);}
+</script>
+{% endblock %}

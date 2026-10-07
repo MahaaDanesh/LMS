@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Assessments{% endblock %}
+{% block page_title %}Assessments{% endblock %}
+{% block page_crumb %}Create and manage quizzes, exams, assignments and projects{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-file-pen"></i>&nbsp; All Assessments <span class="badge badge-blue">{{ assessments|length }}</span></h3>
+    <div class="page-actions">
+      {% if not student_view %}<button class="btn btn-primary" onclick="openAddAssessmentModal()"><i class="fa-solid fa-plus"></i> Add Assessment</button>{% endif %}
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search assessments..." data-search-for="assessmentsTable" oninput="applyFilters('assessmentsTable')">
+    </div>
+    <select class="filter-select" data-filter-for="assessmentsTable" data-field="type" onchange="applyFilters('assessmentsTable')">
+      <option value="">All Types</option>
+      <option value="Quiz">Quiz</option>
+      <option value="Exam">Exam</option>
+      <option value="Assignment">Assignment</option>
+      <option value="Project">Project</option>
+    </select>
+    <select class="filter-select" data-filter-for="assessmentsTable" data-field="status" onchange="applyFilters('assessmentsTable')">
+      <option value="">All Status</option>
+      <option value="Scheduled">Scheduled</option>
+      <option value="Completed">Completed</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="assessmentsTable">
+      <thead>
+        <tr><th>Title</th><th>Type</th><th>Course</th><th>Batch</th><th>Date</th><th>Max Marks</th><th>Status</th><th>Assessment Link</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for a in assessments %}
+        <tr data-row data-id="{{ a.id }}" data-entity="assessments" data-type="{{ a.type }}" data-status="{{ a.status }}">
+          <td class="cell-strong">{{ a.title }}</td>
+          <td><span class="badge badge-blue">{{ a.type }}</span></td>
+          <td>{{ course_name(a.course_id) }}</td>
+          <td>{{ batch_name(a.batch_id) }}</td>
+          <td>{{ a.date }}</td>
+          <td>{{ a.max_marks }}</td>
+          <td><span class="badge {{ 'badge-green' if a.status=='Completed' else 'badge-amber' }}">{{ a.status }}</span></td>
+          <td>{% if a.assessment_link %}<a class="btn btn-outline btn-sm" href="{{ a.assessment_link }}" target="_blank" rel="noopener">View</a>{% else %}<span class="cell-muted">Not added</span>{% endif %}</td>
+          <td>{% if not student_view %}
+            <div class="row-actions"><button class="action-btn edit" title="Edit" onclick='openEditAssessmentModal({{ a|tojson }})'><i class="fa-solid fa-pen"></i></button><button class="action-btn delete" title="Delete" onclick="confirmDelete('assessments', {{ a.id }}, '{{ a.title|e }}')"><i class="fa-solid fa-trash"></i></button></div>
+          {% else %}<span class="cell-muted">Personal assessment</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        <tr class="empty-row" style="display:none;"><td colspan="9">No assessments match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if not student_view %}<div class="modal-overlay" id="assessmentModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="assessmentModalTitle">Add Assessment</h3>
+      <button class="modal-close" onclick="closeModal('assessmentModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="assessmentForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="full form-group">
+            <label>Title</label>
+            <input type="text" name="title" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select name="type" class="form-control" required>
+              <option value="Quiz">Quiz</option>
+              <option value="Exam">Exam</option>
+              <option value="Assignment">Assignment</option>
+              <option value="Project">Project</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Course</label>
+            <select name="course_id" class="form-control" required>
+              {% for c in courses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Batch</label>
+            <select name="batch_id" class="form-control" required>
+              {% for b in batches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" name="date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Max Marks</label>
+            <input type="number" name="max_marks" class="form-control" min="1" required>
+          </div>
+          <div class="full form-group">
+            <label>Assessment Link</label>
+            <input type="url" name="assessment_link" class="form-control" placeholder="https://...">
+          </div>
+          <div class="full form-group">
+            <label>Status</label>
+            <select name="status" class="form-control" required>
+              <option value="Scheduled">Scheduled</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('assessmentModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Assessment</button>
+      </div>
+    </form>
+  </div>
+</div>{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not student_view %}<script>
+var assessmentEditId = null;
+function openAddAssessmentModal(){
+  assessmentEditId = null;
+  document.getElementById('assessmentModalTitle').innerText = 'Add Assessment';
+  document.getElementById('assessmentForm').reset();
+  openModal('assessmentModal');
+}
+function openEditAssessmentModal(a){
+  assessmentEditId = a.id;
+  document.getElementById('assessmentModalTitle').innerText = 'Edit Assessment';
+  document.getElementById('assessmentForm').reset();
+  prefillForm('assessmentForm', a);
+  openModal('assessmentModal');
+}
+document.getElementById('assessmentForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  submitEntityForm('assessments', assessmentEditId ? 'PUT' : 'POST', this, assessmentEditId);
+});
+if(new URLSearchParams(location.search).get('open')==='add'){setTimeout(openAddAssessmentModal,150);}
+</script>{% endif %}
+{% endblock %}
