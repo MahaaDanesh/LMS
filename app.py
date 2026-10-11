@@ -3006,24 +3006,20 @@ def create_course_lesson():
               "created_by": session.get("user_name", "Institute")}
     if kind == "Video":
         uploaded = request.files.get("video_file")
-        external_url = request.form.get("video_url", "").strip()
-        if uploaded and uploaded.filename:
-            from werkzeug.utils import secure_filename
-            filename = secure_filename(uploaded.filename)
-            if not filename.lower().endswith((".mp4", ".webm", ".ogg", ".mov", ".m4v")):
-                flash("Upload a supported video file: MP4, WebM, OGG, MOV or M4V.", "error")
-                return redirect(url_for("course_content_page"))
-            folder = os.path.join(app.root_path, "static", "course_videos")
-            os.makedirs(folder, exist_ok=True)
-            filename = "%s_%s_%s" % (course_id, record["id"], filename)
-            uploaded.save(os.path.join(folder, filename))
-            record["video_filename"] = filename
-            record["video_url"] = url_for("course_video", lesson_id=record["id"])
-        elif external_url.startswith(("https://", "http://")):
-            record["video_url"] = external_url
-        else:
-            flash("Upload a video file or provide a direct video URL.", "error")
+        if not uploaded or not uploaded.filename:
+            flash("Upload a video file to add a video lesson. Video links are not accepted.", "error")
             return redirect(url_for("course_content_page"))
+        from werkzeug.utils import secure_filename
+        filename = secure_filename(uploaded.filename)
+        if not filename.lower().endswith((".mp4", ".webm", ".ogg", ".mov", ".m4v")):
+            flash("Upload a supported video file: MP4, WebM, OGG, MOV or M4V.", "error")
+            return redirect(url_for("course_content_page"))
+        folder = os.path.join(app.root_path, "static", "course_videos")
+        os.makedirs(folder, exist_ok=True)
+        filename = "%s_%s_%s" % (course_id, record["id"], filename)
+        uploaded.save(os.path.join(folder, filename))
+        record["video_filename"] = filename
+        record["video_url"] = url_for("course_video", lesson_id=record["id"])
     else:
         assessment_id = int(request.form.get("assessment_id") or 0)
         assessment = next((a for a in institution_filter(ASSESSMENTS) if int(a.get("id") or 0) == assessment_id and int(a.get("course_id") or 0) == course_id), None)
@@ -3074,7 +3070,6 @@ def edit_course_lesson(lesson_id):
         assessment_id = None
         if kind == "Video":
             uploaded = request.files.get("video_file")
-            external_url = request.form.get("video_url", "").strip()
             if uploaded and uploaded.filename:
                 from werkzeug.utils import secure_filename
                 filename = secure_filename(uploaded.filename)
@@ -3087,15 +3082,11 @@ def edit_course_lesson(lesson_id):
                 uploaded.save(os.path.join(folder, filename))
                 new_video = filename
                 video_url = url_for("course_video", lesson_id=lesson_id)
-            elif external_url.startswith(("https://", "http://")):
-                video_url = external_url
             elif old_video:
                 new_video = old_video
                 video_url = url_for("course_video", lesson_id=lesson_id)
-            elif lesson.get("video_url", "").startswith(("https://", "http://")):
-                video_url = lesson.get("video_url", "")
             else:
-                flash("Keep the existing video, upload a replacement, or provide a direct video URL.", "error")
+                flash("This video lesson has no uploaded video file. Upload a video file; video links are not accepted.", "error")
                 return redirect(url_for("edit_course_lesson", lesson_id=lesson_id))
         else:
             assessment_id = int(request.form.get("assessment_id") or 0)
