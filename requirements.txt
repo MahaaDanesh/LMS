@@ -8,3 +8,4 @@ psycopg-pool==3.2.6
 Flask-Migrate==4.1.0
 python-dotenv==1.1.1
 razorpay==2.0.1
+gunicorn
