@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Certificates{% endblock %}
+{% block page_title %}Certificates{% endblock %}
+{% block page_crumb %}Certificate management and student downloads{% endblock %}
+{% block content %}
+{% if not student_view %}
+<div class="card"><div class="card-header"><h3>Verify & Issue Certificate</h3></div><div class="card-body">
+<form method="post" action="{{ url_for('issue_certificate') }}" enctype="multipart/form-data" class="form-grid">
+<div class="form-group"><label>Student</label><select class="form-control" name="student_id" id="certStudent" required onchange="filterCertCourses()"><option value="">Select student</option>{% for s in students %}<option value="{{ s.id }}" data-courses="{{ student_course_ids(s)|join(',') }}">{{ s.name }} — {{ s.email }}</option>{% endfor %}</select></div>
+<div class="form-group"><label>Course</label><select class="form-control" name="course_id" id="certCourse" required><option value="">Select enrolled course</option>{% for c in courses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+<div class="form-group full"><label>Upload certificate file (PDF/image, optional)</label><input class="form-control" type="file" name="certificate_file" accept=".pdf,.png,.jpg,.jpeg"></div>
+<div class="full"><button class="btn btn-primary" type="submit">Verify & Issue</button></div>
+</form></div></div>
+{% endif %}
+<div class="card"><div class="card-header"><h3>{{ 'My Verified Certificates' if student_view else 'Issued Certificates' }}</h3></div><div class="card-body">
+{% for cert in certificates %}<div style="padding:14px 0;border-bottom:1px solid var(--gray-100)"><strong>{{ cert.course_name }}</strong><div>{{ cert.student_name or '' }} · {{ cert.certificate_number }} · Issued {{ cert.issued_at }}</div>{% if cert.certificate_file %}<a href="{{ cert.certificate_file }}" download>Download certificate</a>{% else %}<span>Certificate verified; no file uploaded.</span>{% endif %}</div>{% else %}<p>No verified certificates yet.</p>{% endfor %}
+</div></div>
+{% endblock %}
+{% block scripts %}<script>
+function filterCertCourses(){const s=document.getElementById('certStudent');const c=document.getElementById('certCourse');if(!s||!c)return;const allowed=(s.selectedOptions[0].dataset.courses||'').split(',');[...c.options].forEach((o,i)=>{if(i)o.hidden=!allowed.includes(o.value);});c.value='';}
+</script>{% endblock %}

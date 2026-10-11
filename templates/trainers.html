@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Trainers{% endblock %}
+{% block page_title %}Trainers{% endblock %}
+{% block page_crumb %}Manage trainer profiles and specializations{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-chalkboard-user"></i>&nbsp; All Trainers <span class="badge badge-blue">{{ trainers|length }}</span></h3>
+    <div class="page-actions">
+      <button class="btn btn-primary" onclick="openAddTrainerModal()"><i class="fa-solid fa-plus"></i> Add Trainer</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search trainers by name or specialization..." data-search-for="trainersTable" oninput="applyFilters('trainersTable')">
+    </div>
+    <select class="filter-select" data-filter-for="trainersTable" data-field="status" onchange="applyFilters('trainersTable')">
+      <option value="">All Status</option>
+      <option value="Active">Active</option>
+      <option value="On Leave">On Leave</option>
+      <option value="Inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="trainersTable">
+      <thead>
+        <tr><th>Trainer</th><th>Email</th><th>Phone</th><th>Specialization</th><th>Experience</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for t in trainers %}
+        <tr data-row data-id="{{ t.id }}" data-entity="trainers" data-status="{{ t.status }}">
+          <td class="cell-strong">{{ t.name }}</td>
+          <td>{{ t.email }}</td>
+          <td>{{ t.phone }}</td>
+          <td>{{ t.specialization }}</td>
+          <td>{{ t.experience }} yrs</td>
+          <td><span class="badge {{ 'badge-green' if t.status=='Active' else 'badge-amber' if t.status=='On Leave' else 'badge-gray' }}">{{ t.status }}</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="action-btn edit" title="Edit" onclick='openEditTrainerModal({{ t|tojson }})'><i class="fa-solid fa-pen"></i></button>
+              <button class="action-btn delete" title="Delete" onclick="confirmDelete('trainers', {{ t.id }}, '{{ t.name|e }}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        <tr class="empty-row" style="display:none;"><td colspan="7">No trainers match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="trainerModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="trainerModalTitle">Add Trainer</h3>
+      <button class="modal-close" onclick="closeModal('trainerModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="trainerForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="full form-group">
+            <label>Full Name</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" name="phone" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Specialization</label>
+            <input type="text" name="specialization" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Experience (Years)</label>
+            <input type="number" name="experience" class="form-control" min="0" required>
+          </div>
+          <div class="full form-group">
+            <label>Status</label>
+            <select name="status" class="form-control" required>
+              <option value="Active">Active</option>
+              <option value="On Leave">On Leave</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('trainerModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Trainer</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var trainerEditId = null;
+function openAddTrainerModal(){
+  trainerEditId = null;
+  document.getElementById('trainerModalTitle').innerText = 'Add Trainer';
+  document.getElementById('trainerForm').reset();
+  openModal('trainerModal');
+}
+function openEditTrainerModal(trainer){
+  trainerEditId = trainer.id;
+  document.getElementById('trainerModalTitle').innerText = 'Edit Trainer';
+  document.getElementById('trainerForm').reset();
+  prefillForm('trainerForm', trainer);
+  openModal('trainerModal');
+}
+document.getElementById('trainerForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  submitEntityForm('trainers', trainerEditId ? 'PUT' : 'POST', this, trainerEditId);
+});
+if(new URLSearchParams(location.search).get('open')==='add'){setTimeout(openAddTrainerModal,150);}
+</script>
+{% endblock %}

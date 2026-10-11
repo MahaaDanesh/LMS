@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Live Class{% endblock %}
+{% block page_title %}Live Class{% endblock %}
+{% block page_crumb %}{{ live_session.topic }} · Attendance is tracked automatically{% endblock %}
+{% block content %}
+<div class="card live-class-card">
+  <div class="card-header">
+    <div>
+      <h3><i class="fa-solid fa-video"></i> {{ live_session.topic }}</h3>
+      <div class="cell-muted">{{ live_session.date }} · {{ live_session.time }} · {{ live_session.duration }}</div>
+    </div>
+    <span class="badge badge-blue" id="attendanceStatus">Connecting…</span>
+  </div>
+  <div class="live-attendance-notice">
+    <i class="fa-solid fa-circle-info"></i>
+    <div><strong>Attendance requirement</strong><br>Stay actively connected to this live class for at least <strong>75%</strong> of the scheduled duration to receive attendance.</div>
+  </div>
+  <div class="live-progress-box">
+    <div class="live-progress-top"><span>Active connection time</span><strong id="timeText">0 / {{ duration_minutes }} min</strong></div>
+    <div class="progress-track"><div class="progress-fill" id="liveProgress" style="width:0%"></div></div>
+    <div class="live-progress-bottom"><span>Required: {{ (duration_minutes * 0.75)|round(1) }} min</span><span id="percentText">0%</span></div>
+  </div>
+  <div id="browserNotice" class="live-attendance-notice" style="display:none;">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <div><strong>Meeting could not open inside this page</strong><br>Try opening the original meeting in a new tab. For video/audio, use an updated Chrome or Edge browser and allow camera/microphone permissions.</div>
+  </div>
+  <div id="jitsiContainer" style="height:70vh;min-height:520px;border-radius:14px;overflow:hidden;background:#0b1220;"></div>
+  <div class="page-actions" style="margin-top:14px;justify-content:flex-start;gap:10px;flex-wrap:wrap;">
+    <a id="openMeetingFallback" class="btn btn-primary" href="{{ live_session.meeting_link|e }}" target="_blank" rel="noopener noreferrer" onclick="startFallbackTracking()"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Meeting in New Tab</a>
+    <span class="cell-muted">If the embedded video shows a WebRTC error, use this button.</span>
+  </div>
+  <div class="page-actions" style="margin-top:14px;justify-content:space-between;">
+    <a class="btn btn-outline" href="{{ url_for('sessions_page') }}"><i class="fa-solid fa-arrow-left"></i> Back to Sessions</a>
+    <button class="btn btn-danger" type="button" onclick="leaveClass()"><i class="fa-solid fa-right-from-bracket"></i> Leave Class</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://meet.jit.si/external_api.js"></script>
+<script>
+const sessionId={{ live_session.id }};
+const durationMinutes={{ duration_minutes }};
+let api=null, heartbeatTimer=null, joined=false, leaving=false;
+const meetingLink={{ live_session.meeting_link|tojson }};
+function showFallback(message){
+  document.getElementById('browserNotice').style.display='flex';
+  if(message) document.getElementById('browserNotice').querySelector('div').innerHTML='<strong>Meeting could not open inside this page</strong><br>'+message+' Use the button below to open the original meeting in a new tab.';
+  document.getElementById('jitsiContainer').style.display='none';
+}
+function startFallbackTracking(){
+  // The external meeting opens from a user click. Keep this page open to continue attendance heartbeats.
+  joined=true;
+  setStatus('Meeting opened · Attendance tracking','badge-blue');
+  if(!heartbeatTimer){heartbeatTimer=setInterval(heartbeat,10000);heartbeat();}
+}
+function post(url, body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(async r=>{const type=r.headers.get('content-type')||'';if(!type.includes('application/json'))throw new Error(r.redirected?'Login/session expired. Please log in again.':'Server returned an unexpected response.');const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed.');return data;});}
+function setStatus(text, cls){const el=document.getElementById('attendanceStatus');el.textContent=text;el.className='badge '+(cls||'badge-blue');}
+function updateProgress(d){
+  const pct=Math.min(100, Number(d.percent||0));
+  document.getElementById('liveProgress').style.width=pct+'%';
+  document.getElementById('percentText').textContent=pct+'%';
+  document.getElementById('timeText').textContent=(d.active_minutes||0)+' / '+durationMinutes+' min';
+  if(d.eligible) setStatus('Attendance eligible','badge-green');
+}
+function heartbeat(){
+  const active=joined && !leaving;
+  post('/api/live-session/'+sessionId+'/heartbeat',{active:active}).then(d=>{if(d.ok){updateProgress(d);if(d.completed){setStatus(d.eligible?'Attendance recorded':'Attendance not granted',''+(d.eligible?'badge-green':'badge-red'));clearInterval(heartbeatTimer);}}});
+}
+function leaveClass(){
+  if(leaving)return; leaving=true;
+  post('/api/live-session/'+sessionId+'/leave',{}).finally(()=>{if(heartbeatTimer)clearInterval(heartbeatTimer);window.location.href='{{ url_for("sessions_page") }}';});
+}
+window.addEventListener('beforeunload',()=>{if(!leaving){navigator.sendBeacon('/api/live-session/'+sessionId+'/leave',new Blob(['{}'],{type:'application/json'}));}});
+document.addEventListener('visibilitychange',()=>{if(joined) heartbeat();});
+post('/api/live-session/'+sessionId+'/join',{}).then(d=>{
+  if(!d.ok){setStatus(d.error||'Unable to join','badge-red');return;}
+  if(!d.meeting_link){setStatus('Live meeting link is not configured','badge-red');showFallback('The trainer has not added a meeting link.');return;}
+  let meetingUrl;
+  try { meetingUrl=new URL(d.meeting_link); } catch(e) { setStatus('Invalid meeting link','badge-red');showFallback('The trainer meeting link is invalid.');return; }
+  // Only embed Jitsi URLs. Google Meet, Teams, Zoom and other providers must open using their own URL.
+  const isJitsi = meetingUrl.hostname==='meet.jit.si' || meetingUrl.hostname.endsWith('.meet.jit.si');
+  if(!isJitsi){
+    setStatus('Open your live meeting in a new tab','badge-blue');
+    showFallback('This session uses an external meeting provider.');
+    return;
+  }
+  if(!window.isSecureContext || !(window.RTCPeerConnection || window.webkitRTCPeerConnection)){
+    setStatus('Browser video support unavailable','badge-red');
+    showFallback('WebRTC is unavailable in this browser or page context. Open the meeting directly, or use an updated Chrome/Edge browser over HTTPS.');
+    return;
+  }
+  if(typeof JitsiMeetExternalAPI==='undefined'){
+    setStatus('Video meeting service did not load','badge-red');
+    showFallback('The meeting script could not load. Check your internet connection or browser extensions.');
+    return;
+  }
+  const room=meetingUrl.pathname.split('/').filter(Boolean).pop() || ('LMS-'+sessionId);
+  try {
+    api=new JitsiMeetExternalAPI(meetingUrl.hostname,{roomName:room,parentNode:document.getElementById('jitsiContainer'),width:'100%',height:'100%',configOverwrite:{prejoinPageEnabled:true},interfaceConfigOverwrite:{TOOLBAR_BUTTONS:['microphone','camera','desktop','chat','raisehand','tileview','fullscreen','hangup']}});
+    api.addEventListener('videoConferenceJoined',()=>{joined=true;setStatus('Live · Attendance tracking','badge-blue');if(!heartbeatTimer)heartbeatTimer=setInterval(heartbeat,10000);heartbeat();});
+    api.addEventListener('videoConferenceLeft',()=>{joined=false;post('/api/live-session/'+sessionId+'/leave',{}).then(d=>{if(d.ok)updateProgress(d);});});
+    api.addEventListener('readyToClose',()=>{if(!leaving)leaveClass();});
+    api.addEventListener('errorOccurred',()=>{setStatus('Meeting embed error','badge-red');showFallback('The embedded meeting failed to start.');});
+  } catch(e) {
+    setStatus('Meeting embed error','badge-red');
+    showFallback('The embedded meeting failed to start.');
+  }
+}).catch(err=>{setStatus(err.message||'Unable to connect to live class','badge-red');showFallback('Could not connect to the attendance service.');});
+</script>
+{% endblock %}

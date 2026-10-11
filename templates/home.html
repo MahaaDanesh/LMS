@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block page_title %}Home{% endblock %}
+{% block page_crumb %}Manage your institute from one place{% endblock %}
+{% block content %}
+<div class="wf-grid">
+  <div class="wf-box"><h3><i class="fa-solid fa-book"></i> Course</h3><div class="wf-actions"><a class="wf-btn" href="{{ url_for('courses_page') }}?open=add">+ Add</a><a class="wf-btn wf-btn-outline" href="{{ url_for('courses_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-chalkboard-user"></i> Trainer</h3><div class="wf-actions"><a class="wf-btn" href="{{ url_for('trainers_page') }}?open=add">+ Add</a><a class="wf-btn wf-btn-outline" href="{{ url_for('trainers_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-layer-group"></i> Batches</h3><div class="wf-actions"><a class="wf-btn" href="{{ url_for('batches_page') }}?open=add">+ Add</a><a class="wf-btn wf-btn-outline" href="{{ url_for('batches_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-user-graduate"></i> Students</h3><div class="wf-actions"><a class="wf-btn" href="{{ url_for('students_page') }}?open=add">+ Add</a><a class="wf-btn wf-btn-outline" href="{{ url_for('students_page') }}?status=Active">Registered</a><a class="wf-btn wf-btn-outline" href="{{ url_for('students_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-calendar-days"></i> Sessions</h3><div class="wf-actions"><a class="wf-btn" href="{{ url_for('sessions_page') }}?open=add">+ Add</a><a class="wf-btn wf-btn-outline" href="{{ url_for('sessions_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-clipboard-check"></i> Attendance</h3><div class="wf-actions"><a class="wf-btn wf-btn-outline" href="{{ url_for('attendance_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-folder-open"></i> Announcements & Materials</h3><div class="wf-actions"><a class="wf-btn" href="{{ url_for('announcements_page') }}?open=add">+ Add</a><a class="wf-btn wf-btn-outline" href="{{ url_for('announcements_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-file-pen"></i> Assessment</h3><div class="wf-actions"><a class="wf-btn" href="{{ url_for('assessments_page') }}?open=add">+ Add</a><a class="wf-btn wf-btn-outline" href="{{ url_for('assessments_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-chart-column"></i> Report</h3><div class="wf-actions"><a class="wf-btn wf-btn-outline" href="{{ url_for('reports_page') }}">View / Download</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-people-roof"></i> Parents / Guardians</h3><div class="wf-actions"><a class="wf-btn wf-btn-outline" href="{{ url_for('guardians_page') }}">View</a></div></div>
+  <div class="wf-box"><h3><i class="fa-solid fa-wallet"></i> Payments</h3><div class="wf-actions"><a class="wf-btn wf-btn-outline" href="{{ url_for('payments_page') }}">View</a></div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}My Learning{% endblock %}{% block page_title %}My Learning{% endblock %}{% block page_crumb %}Watch lessons, complete quizzes and track course progress{% endblock %}
+{% block content %}
+<div class="card"><div class="card-header"><h3><i class="fa-solid fa-book-open-reader"></i> My Courses</h3></div><div class="card-body">
+{% for c in courses %}<section style="border:1px solid var(--gray-200);border-radius:12px;padding:18px;margin-bottom:18px"><h3>{{ c.name }}</h3><p>{{ c.description or '' }}</p>
+<div style="display:flex;justify-content:space-between"><strong>Course completion</strong><strong id="percent-{{ c.id }}">{{ c.learning_percent }}%</strong></div><div style="height:9px;background:var(--gray-100);border-radius:20px;margin:8px 0 16px"><div id="bar-{{ c.id }}" style="height:9px;width:{{ c.learning_percent }}%;background:var(--primary,#4f46e5);border-radius:20px"></div></div>
+{% for lesson in c.learning_lessons %}<article data-course="{{ c.id }}" data-lesson="{{ lesson.key }}" data-kind="{{ lesson.kind }}" data-unlocked="{{ 'true' if lesson.unlocked else 'false' }}" data-completed="{{ 'true' if lesson.completed else 'false' }}" style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;margin:12px 0;opacity:{{ '1' if lesson.unlocked else '.62' }}">
+<div style="display:flex;align-items:center;gap:10px"><span>{% if lesson.completed %}<i class="fa-solid fa-circle-check" style="color:#16a34a"></i>{% elif lesson.unlocked %}<i class="fa-regular fa-circle-play"></i>{% else %}<i class="fa-solid fa-lock"></i>{% endif %}</span><div style="flex:1"><strong>{{ loop.index }}. {{ lesson.title }}</strong><small style="display:block;color:var(--gray-500)">{{ lesson.kind }}{% if lesson.completed %} · Completed{% elif not lesson.unlocked %} · Locked until previous item is complete{% endif %}</small>{% if lesson.description %}<p>{{ lesson.description }}</p>{% endif %}</div></div>
+{% if lesson.kind == 'Video' and lesson.unlocked and lesson.url %}<div style="margin-top:12px">{% if lesson.url.lower().endswith(('.mp4','.webm','.ogg','.mov','.m4v')) or '/course-video/' in lesson.url %}<video controls preload="metadata" style="width:100%;max-height:480px;border-radius:8px;background:#111" data-video-lesson="{{ lesson.id }}" data-course="{{ c.id }}"><source src="{{ lesson.url }}">Your browser does not support HTML5 video.</video><p class="cell-muted">Watch at least 90% of this video to unlock the next topic. Seeking forward does not count as watching.</p>{% else %}<p>Video link: <a href="{{ lesson.url }}" target="_blank" rel="noopener">Open video</a></p><p class="cell-muted">To track watch progress, the trainer should upload the video file or use a direct MP4/WebM/OGG URL.</p>{% endif %}</div>{% elif lesson.kind == 'Assessment' %}<div style="margin-top:12px">
+{% if lesson.completed %}<div class="live-attendance-notice"><strong style="color:#16a34a">Assessment evaluated · Score {{ lesson.score }}/{{ lesson.max_marks }}</strong><br>Your result is saved in My Learning.</div>
+{% elif not lesson.unlocked %}<span>Complete the previous video/quiz to unlock this assessment.</span>
+{% elif lesson.expired %}<span class="flash-msg error">Deadline passed · submissions are closed.</span>
+{% elif lesson.questions %}
+<div style="padding:14px;border:1px solid var(--gray-200);border-radius:10px;background:var(--gray-50);margin-top:10px"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong>{{ lesson.title }}</strong><span class="cell-muted">{{ lesson.questions|length }} questions · Max {{ lesson.max_marks }} marks · Deadline {{ lesson.deadline or 'Not set' }}</span></div>
+<form class="inline-quiz-form" data-assessment-id="{{ lesson.assessment_id }}" data-submit-url="{{ url_for('submit_assessment', assessment_id=lesson.assessment_id) }}" style="margin-top:12px">
+{% for q in lesson.questions %}{% set q_index = loop.index0 %}<section style="border:1px solid var(--gray-200);border-radius:9px;padding:13px;margin:12px 0;background:white"><h4 style="margin:0 0 8px">{{ loop.index }}. {{ q.question }}</h4><small class="cell-muted">{{ q.marks if q.marks else 'Weighted' }} {% if q.marks %}marks{% else %}question{% endif %}</small>
+{% for option in q.options %}<label style="display:flex;gap:9px;align-items:center;padding:7px 0"><input type="radio" name="q{{ q_index }}" value="{{ loop.index0 }}" required> <span>{{ option }}</span></label>{% endfor %}</section>{% endfor %}
+<button class="btn btn-primary" type="submit"><i class="fa-solid fa-check"></i> Submit & Evaluate</button><span class="quiz-submit-status cell-muted" style="margin-left:10px"></span></form><div class="inline-quiz-result" aria-live="polite"></div></div>
+{% else %}<span>Quiz questions are not configured yet. Contact your trainer.</span>{% endif %}</div>{% endif %}
+</article>{% endfor %}
+</section>{% else %}<p>You are not enrolled in any courses yet.</p>{% endfor %}</div></div>
+{% if certificates %}<div class="card"><div class="card-header"><h3>Verified Certificates</h3></div><div class="card-body">{% for cert in certificates %}<p><strong>{{ cert.course_name }}</strong> · {{ cert.certificate_number }} {% if cert.certificate_file %}<a href="{{ cert.certificate_file }}" download>Download certificate</a>{% endif %}</p>{% endfor %}</div></div>{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+const watchTimers = new Map();
+document.querySelectorAll('video[data-video-lesson]').forEach(video=>{
+  let maxWatched=0, lastTime=video.currentTime||0, ignoreNextTimeUpdate=false;
+  video.addEventListener('timeupdate',()=>{const t=video.currentTime;if(ignoreNextTimeUpdate){ignoreNextTimeUpdate=false;lastTime=t;return;}const delta=t-lastTime;if(!video.seeking && delta>=0 && delta<=2.5)maxWatched+=delta;lastTime=t;});
+  video.addEventListener('seeking',()=>{ignoreNextTimeUpdate=true;lastTime=video.currentTime;});
+  video.addEventListener('ended',async()=>{
+    const duration=video.duration||0;if(!duration||maxWatched/duration<.90){alert('Please watch at least 90% of the video.');return;}
+    const res=await fetch('/api/course-lessons/'+video.dataset.videoLesson+'/watch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watched_seconds:maxWatched,duration_seconds:duration})});
+    const data=await res.json();if(!res.ok){alert(data.error||'Could not save video progress');return;}if(data.completed){alert('Video completed! The next lesson is now unlocked.');location.reload();}
+  });
+});
+
+document.querySelectorAll('.inline-quiz-form').forEach(form=>{
+ form.addEventListener('submit',async function(e){
+  e.preventDefault(); const button=this.querySelector('button[type="submit"]'); const status=this.querySelector('.quiz-submit-status'); const result=this.parentElement.querySelector('.inline-quiz-result');
+  const answers={}; [...this.querySelectorAll('section')].forEach((section,i)=>{const picked=section.querySelector('input[type="radio"]:checked');if(picked)answers[String(i)]=picked.value;});
+  button.disabled=true;status.textContent='Evaluating…';
+  try{
+   const response=await fetch(this.dataset.submitUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers})});
+   const data=await response.json(); if(!response.ok)throw new Error(data.error||'Could not submit assessment');
+   let html='<div class="live-attendance-notice" style="margin-top:14px"><strong>Result: '+data.marks+' / '+data.max_marks+'</strong><br>Correct answers: '+data.correct_answers+' / '+data.total_questions+'<br>Status: '+(data.passed?'Passed':'Submitted')+'</div><h4 style="margin-top:14px">Evaluation &amp; Answer Review</h4><ol style="padding-left:22px">';
+   (data.review||[]).forEach(item=>{html+='<li style="margin:12px 0"><strong>'+escQuiz(item.question)+'</strong><br>Your answer: '+escQuiz(item.chosen_answer)+'<br>Correct answer: '+escQuiz(item.correct_answer)+'<br>Marks: '+item.earned_question_marks+' / '+item.question_marks+' <span class="badge '+(item.correct?'badge-green':'badge-amber')+'">'+(item.correct?'Correct':'Review')+'</span></li>';});
+   result.innerHTML=html+'</ol>'; this.querySelectorAll('input,button').forEach(el=>el.disabled=true);status.textContent='Evaluated and saved';
+   const article=this.closest('article'); article.dataset.completed='true';
+   const heading=article.querySelector('small'); if(heading)heading.textContent='Assessment · Completed';
+   const courseId=article.dataset.course; const lessons=[...document.querySelectorAll('article[data-course="'+courseId+'"]')];
+   const completed=lessons.filter(item=>item.dataset.completed==='true').length; const next=lessons.length?Math.round(100*completed/lessons.length):0;
+   const percent=document.getElementById('percent-'+courseId); const bar=document.getElementById('bar-'+courseId); if(percent)percent.textContent=next+'%'; if(bar)bar.style.width=next+'%';
+  }catch(err){status.textContent=err.message;button.disabled=false;}
+ });
+});
+function escQuiz(value){return String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+</script>{% endblock %}

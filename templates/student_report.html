@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Student Report{% endblock %}
+{% block page_title %}Student Report{% endblock %}
+{% block page_crumb %}Enrollment, attendance, learning and assessment summary{% endblock %}
+{% block content %}
+<div class="card"><div class="card-header"><h3>{{ student.name }} <span class="badge badge-blue">Student report</span></h3></div><div class="card-body">
+<p><strong>Email:</strong> {{ student.email }} &nbsp; <strong>Phone:</strong> {{ student.phone or '—' }} &nbsp; <strong>Status:</strong> {{ student.status }}</p>
+<h3>Enrolled courses</h3>{% for c in courses %}<p>{{ c.name }} — {{ c.code }} | {{ c.duration }}</p>{% else %}<p>No enrolled courses.</p>{% endfor %}
+<h3>Attendance report</h3><p>{{ attendance|selectattr('status','equalto','Present')|list|length }} present records out of {{ attendance|length }} recorded sessions.</p>
+<h3>Assessments</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Assessment</th><th>Deadline</th><th>Max marks</th><th>Result</th></tr></thead><tbody>
+{% for a in assessments %}{% set mark = marks|selectattr('assessment_id','equalto',a.id)|list %}<tr><td>{{ a.title }}</td><td>{{ a.deadline or a.date or '—' }}</td><td>{{ a.max_marks }}</td><td>{% if mark %}{{ mark[0].marks }}/{{ a.max_marks }}{% else %}Not evaluated{% endif %}</td></tr>{% else %}<tr><td colspan="4">No assessments assigned.</td></tr>{% endfor %}
+</tbody></table></div>
+<h3>Self-paced completion</h3><p>{{ progress|selectattr('completed')|list|length }} lesson completions saved.</p>
+<h3>Certificates</h3>{% for cert in certificates %}<p>{{ cert.course_name }} — {{ 'Verified' if cert.verified else 'Pending' }} {% if cert.certificate_file %}<a href="{{ cert.certificate_file }}" download>Download</a>{% endif %}</p>{% else %}<p>No certificates issued yet.</p>{% endfor %}
+</div></div>
+{% endblock %}

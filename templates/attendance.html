@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Attendance{% endblock %}
+{% block page_title %}Attendance{% endblock %}
+{% block page_crumb %}Mark attendance and track student percentages{% endblock %}
+
+{% block content %}
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-top"><div class="stat-icon" style="background:var(--green-600);"><i class="fa-solid fa-user-check"></i></div></div>
+    <div class="stat-value">{{ attendance|selectattr('status','equalto','Present')|list|length }}</div>
+    <div class="stat-label">Present Records</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-top"><div class="stat-icon" style="background:var(--amber-600);"><i class="fa-solid fa-clock"></i></div></div>
+    <div class="stat-value">{{ attendance|selectattr('status','equalto','Late')|list|length }}</div>
+    <div class="stat-label">Late Records</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-top"><div class="stat-icon" style="background:var(--red-600);"><i class="fa-solid fa-user-xmark"></i></div></div>
+    <div class="stat-value">{{ attendance|selectattr('status','equalto','Absent')|list|length }}</div>
+    <div class="stat-label">Absent Records</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-clipboard-check"></i>&nbsp; Attendance Log <span class="badge badge-blue">{{ attendance|length }}</span></h3>
+    <div class="page-actions">
+      {% if not student_view %}<button class="btn btn-primary" onclick="openAddAttendanceModal()"><i class="fa-solid fa-plus"></i> Mark Attendance</button>{% endif %}
+    </div>
+  </div>
+
+  {% if student_view %}
+  <div class="personal-attendance-summary">
+    <div class="personal-title"><i class="fa-solid fa-user-check"></i> My Attendance</div>
+    <div class="personal-subtitle">Only your attendance records are shown here.</div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="attendanceTable">
+      <thead><tr><th>Date</th><th>Course / Batch</th><th>Status</th><th>Attendance %</th></tr></thead>
+      <tbody>
+        {% for a in attendance %}
+        <tr data-row data-id="{{ a.id }}" data-entity="attendance" data-status="{{ a.status }}">
+          <td>{{ a.date }}</td>
+          <td>{{ batch_name(a.batch_id) }}</td>
+          <td><span class="badge {{ 'badge-green' if a.status=='Present' else 'badge-amber' if a.status=='Late' else 'badge-red' }}">{{ a.status }}</span></td>
+          <td>
+            {% set pct = attendance_percentage(a.student_id) %}
+            <div class="progress-wrap"><div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%; background:{{ 'var(--green-600)' if pct>=75 else 'var(--amber-600)' if pct>=50 else 'var(--red-600)' }};"></div></div><span>{{ pct }}%</span></div>
+          </td>
+        </tr>
+        {% else %}<tr><td colspan="4">No attendance records found for your account.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="toolbar">
+    <div class="search-box"><i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i><input type="text" placeholder="Search by student or batch..." data-search-for="attendanceTable" oninput="applyFilters('attendanceTable')"></div>
+    <select class="filter-select" data-filter-for="attendanceTable" data-field="status" onchange="applyFilters('attendanceTable')"><option value="">All Status</option><option value="Present">Present</option><option value="Absent">Absent</option><option value="Late">Late</option></select>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="attendanceTable">
+      <thead><tr><th>Student</th><th>Batch</th><th>Date</th><th>Status</th><th>Overall %</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for a in attendance %}
+        <tr data-row data-id="{{ a.id }}" data-entity="attendance" data-status="{{ a.status }}">
+          <td class="cell-strong">{{ student_name(a.student_id) }}</td><td>{{ batch_name(a.batch_id) }}</td><td>{{ a.date }}</td>
+          <td><select class="filter-select" style="min-width:110px;" onchange="markAttendance(this,'attendance',{{ a.id }})"><option value="Present" {{ 'selected' if a.status=='Present' }}>Present</option><option value="Absent" {{ 'selected' if a.status=='Absent' }}>Absent</option><option value="Late" {{ 'selected' if a.status=='Late' }}>Late</option></select></td>
+          <td>{% set pct = attendance_percentage(a.student_id) %}<div class="progress-wrap"><div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%; background:{{ 'var(--green-600)' if pct>=75 else 'var(--amber-600)' if pct>=50 else 'var(--red-600)' }};"></div></div><span>{{ pct }}%</span></div></td>
+          <td><div class="row-actions"><button class="action-btn delete" title="Delete" onclick="confirmDelete('attendance', {{ a.id }}, 'this attendance record')"><i class="fa-solid fa-trash"></i></button></div></td>
+        </tr>
+        {% endfor %}<tr class="empty-row" style="display:none;"><td colspan="6">No attendance records match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  </div>
+</div>
+
+<div class="modal-overlay" id="attendanceModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Mark Attendance</h3>
+      <button class="modal-close" onclick="closeModal('attendanceModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="attendanceForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Student</label>
+            <select name="student_id" class="form-control" required>
+              {% for s in students %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Batch</label>
+            <select name="batch_id" class="form-control" required>
+              {% for b in batches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" name="date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status" class="form-control" required>
+              <option value="Present">Present</option>
+              <option value="Absent">Absent</option>
+              <option value="Late">Late</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('attendanceModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Record</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddAttendanceModal(){
+  document.getElementById('attendanceForm').reset();
+  openModal('attendanceModal');
+}
+document.getElementById('attendanceForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  submitEntityForm('attendance', 'POST', this);
+});
+</script>
+{% endblock %}

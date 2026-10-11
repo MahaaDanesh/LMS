@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Assessments{% endblock %}
+{% block page_title %}Assessments{% endblock %}
+{% block page_crumb %}Create and manage quizzes, exams, assignments and projects{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-file-pen"></i>&nbsp; All Assessments <span class="badge badge-blue">{{ assessments|length }}</span></h3>
+    <div class="page-actions">
+      {% if not student_view %}<button class="btn btn-primary" onclick="openAddAssessmentModal()"><i class="fa-solid fa-plus"></i> Add Assessment</button>{% endif %}
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search assessments..." data-search-for="assessmentsTable" oninput="applyFilters('assessmentsTable')">
+    </div>
+    <select class="filter-select" data-filter-for="assessmentsTable" data-field="type" onchange="applyFilters('assessmentsTable')">
+      <option value="">All Types</option>
+      <option value="Quiz">Quiz</option>
+      <option value="Exam">Exam</option>
+      <option value="Assignment">Assignment</option>
+      <option value="Project">Project</option>
+    </select>
+    <select class="filter-select" data-filter-for="assessmentsTable" data-field="status" onchange="applyFilters('assessmentsTable')">
+      <option value="">All Status</option>
+      <option value="Scheduled">Scheduled</option>
+      <option value="Completed">Completed</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="assessmentsTable">
+      <thead>
+        <tr><th>Title</th><th>Type</th><th>Course</th><th>Batch</th><th>Date</th><th>Max Marks</th><th>Status</th><th>Evaluation</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for a in assessments %}
+        <tr data-row data-id="{{ a.id }}" data-entity="assessments" data-type="{{ a.type }}" data-status="{{ a.status }}">
+          <td class="cell-strong">{{ a.title }}</td>
+          <td><span class="badge badge-blue">{{ a.type }}</span></td>
+          <td>{{ course_name(a.course_id) }}</td>
+          <td>{{ batch_name(a.batch_id) }}</td>
+          <td>{{ a.date }}</td>
+          <td>{{ a.max_marks }}</td>
+          <td><span class="badge {{ 'badge-green' if a.status=='Completed' else 'badge-amber' }}">{{ a.status }}</span></td>
+          <td><span class="cell-muted">{% if a.questions %}Auto-evaluated in My Learning{% else %}Questions not configured{% endif %}</span></td>
+          <td>{% if not student_view %}
+            <div class="row-actions"><button class="action-btn edit" title="Edit" onclick='openEditAssessmentModal({{ a|tojson }})'><i class="fa-solid fa-pen"></i></button><button class="action-btn delete" title="Delete" onclick="confirmDelete('assessments', {{ a.id }}, '{{ a.title|e }}')"><i class="fa-solid fa-trash"></i></button></div>
+          {% else %}<span class="cell-muted">Personal assessment</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        <tr class="empty-row" style="display:none;"><td colspan="9">No assessments match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if not student_view %}<div class="modal-overlay" id="assessmentModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="assessmentModalTitle">Add Assessment</h3>
+      <button class="modal-close" onclick="closeModal('assessmentModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="assessmentForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="full form-group">
+            <label>Title</label>
+            <input type="text" name="title" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select name="type" class="form-control" required>
+              <option value="Quiz">Quiz</option>
+              <option value="Exam">Exam</option>
+              <option value="Assignment">Assignment</option>
+              <option value="Project">Project</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Course</label>
+            <select name="course_id" class="form-control" required>
+              {% for c in courses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Batch</label>
+            <select name="batch_id" class="form-control" required>
+              {% for b in batches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" name="date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Max Marks</label>
+            <input type="number" name="max_marks" class="form-control" min="1" required>
+          </div>
+          <div class="full form-group">
+            <label>Quiz Builder (Google Forms style)</label>
+            <div id="quizBuilder" style="border:1px solid var(--gray-200);border-radius:10px;padding:12px;margin-bottom:10px"></div>
+            <button type="button" class="btn btn-outline" onclick="addQuizQuestion()"><i class="fa-solid fa-plus"></i> Add question</button>
+            <input type="hidden" name="questions_text" id="questionsText">
+            <small>Add a question, enter 2–4 options, and select the correct answer. Questions are automatically graded.</small>
+          </div>
+          <div class="form-group"><label>Passing Marks</label><input type="number" name="passing_marks" class="form-control" min="0" value="0"></div>
+          <div class="form-group"><label>Deadline</label><input type="date" name="deadline" class="form-control"></div>
+          <div class="full form-group">
+            <label>Status</label>
+            <select name="status" class="form-control" required>
+              <option value="Scheduled">Scheduled</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('assessmentModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Assessment</button>
+      </div>
+    </form>
+  </div>
+</div>{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not student_view %}<script>
+var assessmentEditId = null;
+let quizQuestionCount = 0;
+function addQuizQuestion(question='', options=['',''], correct=0, marks=1){
+  const id=++quizQuestionCount; const box=document.createElement('div'); box.className='quiz-question-card';box.dataset.qid=id;box.style.cssText='border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin:10px 0';
+  box.innerHTML=`<div style="display:flex;gap:8px;align-items:center"><strong style="flex:1">Question ${id}</strong><button type="button" class="btn btn-outline btn-sm" onclick="this.closest('.quiz-question-card').remove();renumberQuestions()">Remove</button></div><input class="form-control qb-question" style="margin:8px 0" placeholder="Enter question" required value="${escapeHtmlQ(question)}"><label style="display:block;margin:8px 0 4px">Question marks</label><input type="number" class="form-control qb-marks" min="0.5" step="0.5" required value="${Number(marks)||1}" style="max-width:180px;margin-bottom:8px"><div class="qb-options"></div>`;
+  const opts=box.querySelector('.qb-options'); options.slice(0,4).forEach((v,i)=>{const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center;margin:6px 0';row.innerHTML=`<input type="radio" name="correct-${id}" value="${i}" ${i===correct?'checked':''} aria-label="Correct option"><input class="form-control qb-option" placeholder="Option ${String.fromCharCode(65+i)}" value="${escapeHtmlQ(v)}" required>`;opts.appendChild(row);});
+  const add=document.createElement('button');add.type='button';add.className='btn btn-outline btn-sm';add.textContent='Add option';add.onclick=()=>{const rows=opts.querySelectorAll('.qb-option');if(rows.length>=4)return alert('Maximum 4 options per question.');const i=rows.length,row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center;margin:6px 0';row.innerHTML=`<input type="radio" name="correct-${id}" value="${i}" aria-label="Correct option"><input class="form-control qb-option" placeholder="Option ${String.fromCharCode(65+i)}" required>`;opts.appendChild(row);};box.appendChild(add);document.getElementById('quizBuilder').appendChild(box);
+}
+function escapeHtmlQ(v){return String(v||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');}
+function renumberQuestions(){document.querySelectorAll('.quiz-question-card').forEach((q,i)=>q.querySelector('strong').textContent='Question '+(i+1));}
+function loadQuizBuilder(questions){document.getElementById('quizBuilder').innerHTML='';quizQuestionCount=0;(questions||[]).forEach(q=>addQuizQuestion(q.question,q.options||['',''],Number(q.correct_index||0),Number(q.marks||1)));}
+function serializeQuizBuilder(){const lines=[];for(const card of document.querySelectorAll('.quiz-question-card')){const question=card.querySelector('.qb-question').value.trim();const opts=[...card.querySelectorAll('.qb-option')].map(x=>x.value.trim());const selected=card.querySelector('input[type=radio]:checked');const marks=Number(card.querySelector('.qb-marks').value);if(!question||opts.length<2||opts.some(x=>!x)||!selected||!Number.isFinite(marks)||marks<=0){alert('Each quiz question needs text, at least two options, a correct answer, and positive marks.');return null;}lines.push([question,...opts,Number(selected.value)+1,'marks='+marks].join(' | '));}return lines.join('\n');}
+
+function openAddAssessmentModal(){
+  assessmentEditId = null;
+  document.getElementById('assessmentModalTitle').innerText = 'Add Assessment';
+  document.getElementById('assessmentForm').reset();
+  loadQuizBuilder([]); addQuizQuestion();
+  openModal('assessmentModal');
+}
+function openEditAssessmentModal(a){
+  assessmentEditId = a.id;
+  document.getElementById('assessmentModalTitle').innerText = 'Edit Assessment';
+  document.getElementById('assessmentForm').reset();
+  prefillForm('assessmentForm', a);
+  const deadline=document.querySelector('#assessmentForm [name="deadline"]');if(deadline)deadline.value=a.deadline||a.date||'';
+  loadQuizBuilder(a.questions||[]);
+  openModal('assessmentModal');
+}
+document.getElementById('assessmentForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const serialized=serializeQuizBuilder();if(serialized===null)return;
+  document.getElementById('questionsText').value=serialized;
+  submitEntityForm('assessments', assessmentEditId ? 'PUT' : 'POST', this, assessmentEditId);
+});
+if(new URLSearchParams(location.search).get('open')==='add'){setTimeout(openAddAssessmentModal,150);}
+</script>{% endif %}
+{% endblock %}

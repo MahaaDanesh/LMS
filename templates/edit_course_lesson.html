@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Edit Course Content{% endblock %}
+{% block page_title %}Edit Course Content{% endblock %}
+{% block page_crumb %}Update a lesson, video, or assessment in the course curriculum{% endblock %}
+{% block content %}
+<div class="card"><div class="card-header"><h3><i class="fa-solid fa-pen-to-square"></i> Edit Topic</h3></div><div class="card-body">
+<form method="post" enctype="multipart/form-data" class="form-grid" id="editLessonForm">
+<div class="form-group"><label>Course</label><select class="form-control" name="course_id" id="editLessonCourse" required onchange="filterEditQuizOptions()">{% for c in courses %}<option value="{{ c.id }}" {% if c.id == lesson.course_id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+<div class="form-group"><label>Topic title</label><input class="form-control" name="title" required value="{{ lesson.title }}"></div>
+<div class="form-group"><label>Content type</label><select class="form-control" name="kind" id="editLessonKind" onchange="toggleEditLessonType()"><option value="Video" {% if lesson.kind == 'Video' %}selected{% endif %}>Video lesson</option><option value="Assessment" {% if lesson.kind == 'Assessment' %}selected{% endif %}>Quiz / assessment</option></select></div>
+<div class="form-group"><label>Position / order</label><input class="form-control" name="position" type="number" min="1" required value="{{ lesson.position or 1 }}"></div>
+<div class="full form-group"><label>Description / learning objective</label><textarea class="form-control" name="description" rows="3">{{ lesson.description or '' }}</textarea></div>
+<div class="full form-group" id="editVideoFields"><label>Replace uploaded video (optional)</label><input class="form-control" type="file" name="video_file" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-m4v"><small>Leave empty to keep the current video. Supported: MP4, WebM, OGG, MOV, M4V.</small><label style="margin-top:12px">Direct video URL</label><input class="form-control" type="url" name="video_url" placeholder="https://example.com/lesson.mp4" value="{% if not lesson.video_filename %}{{ lesson.video_url or '' }}{% endif %}"></div>
+<div class="full form-group" id="editQuizFields"><label>Quiz / assessment</label><select class="form-control" name="assessment_id" id="editLessonAssessment"><option value="">Select quiz</option>{% for a in assessments %}<option value="{{ a.id }}" data-course="{{ a.course_id }}" {% if a.id == lesson.assessment_id %}selected{% endif %}>{{ a.title }}</option>{% endfor %}</select><small>The quiz must belong to the selected course. Editing this curriculum item does not delete the quiz record.</small></div>
+<div class="full" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button><a class="btn btn-secondary" href="{{ url_for('course_content_page') }}">Cancel</a></div>
+</form></div></div>
+{% endblock %}
+{% block scripts %}<script>
+function toggleEditLessonType(){const q=document.getElementById('editLessonKind').value==='Assessment';document.getElementById('editVideoFields').style.display=q?'none':'block';document.getElementById('editQuizFields').style.display=q?'block':'none';filterEditQuizOptions();}
+function filterEditQuizOptions(){const course=document.getElementById('editLessonCourse').value;const select=document.getElementById('editLessonAssessment');[...select.options].forEach(o=>{if(o.value)o.hidden=(o.dataset.course!==course);});if(select.selectedOptions[0]&&select.selectedOptions[0].hidden)select.value='';}
+toggleEditLessonType();
+</script>{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Guardians{% endblock %}
+{% block page_title %}Guardians{% endblock %}
+{% block page_crumb %}Manage parent and guardian contact details{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-people-roof"></i>&nbsp; All Guardians <span class="badge badge-blue">{{ guardians|length }}</span></h3>
+    <div class="page-actions"><span class="cell-muted">Details are captured during student registration</span></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search guardians by name or student..." data-search-for="guardiansTable" oninput="applyFilters('guardiansTable')">
+    </div>
+    <select class="filter-select" data-filter-for="guardiansTable" data-field="relation" onchange="applyFilters('guardiansTable')">
+      <option value="">All Relations</option>
+      <option value="Father">Father</option>
+      <option value="Mother">Mother</option>
+      <option value="Guardian">Guardian</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="guardiansTable">
+      <thead>
+        <tr><th>Guardian</th><th>Relation</th><th>Phone</th><th>Linked Student</th><th>Address</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for g in guardians %}
+        <tr data-row data-id="{{ g.id }}" data-entity="guardians" data-relation="{{ g.relation }}">
+          <td class="cell-strong">{{ g.name }}</td>
+          <td><span class="badge badge-blue">{{ g.relation }}</span></td>
+          <td>{{ g.phone }}</td>
+          <td>{{ student_name(g.student_id) }}</td>
+          <td class="cell-muted">{{ g.address }}</td>
+          <td><span class="cell-muted">View only</span></td>
+        </tr>
+        {% endfor %}
+        <tr class="empty-row" style="display:none;"><td colspan="6">No guardians match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Batches{% endblock %}
+{% block page_title %}Batches{% endblock %}
+{% block page_crumb %}Manage batch schedules, trainers and enrollment{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-layer-group"></i>&nbsp; All Batches <span class="badge badge-blue">{{ batches|length }}</span></h3>
+    <div class="page-actions">
+      <button class="btn btn-primary" onclick="openAddBatchModal()"><i class="fa-solid fa-plus"></i> Add Batch</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search batches..." data-search-for="batchesTable" oninput="applyFilters('batchesTable')">
+    </div>
+    <select class="filter-select" data-filter-for="batchesTable" data-field="status" onchange="applyFilters('batchesTable')">
+      <option value="">All Status</option>
+      <option value="Upcoming">Upcoming</option>
+      <option value="Ongoing">Ongoing</option>
+      <option value="Completed">Completed</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="batchesTable">
+      <thead>
+        <tr><th>Batch</th><th>Course</th><th>Trainer</th><th>Timing</th><th>Duration</th><th>Enrollment</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for b in batches %}
+        <tr data-row data-id="{{ b.id }}" data-entity="batches" data-status="{{ b.status }}">
+          <td class="cell-strong">{{ b.name }}</td>
+          <td>{{ course_name(b.course_id) }}</td>
+          <td>{{ trainer_name(b.trainer_id) }}</td>
+          <td>{{ b.timing }}</td>
+          <td class="cell-muted">{{ b.start_date }} → {{ b.end_date }}</td>
+          <td>
+            <div class="progress-wrap">
+              <div class="progress-track"><div class="progress-fill" style="width:{{ (b.enrolled / b.capacity * 100) | round }}%;"></div></div>
+              <span>{{ b.enrolled }}/{{ b.capacity }}</span>
+            </div>
+          </td>
+          <td><span class="badge {{ 'badge-green' if b.status=='Ongoing' else 'badge-amber' if b.status=='Upcoming' else 'badge-gray' }}">{{ b.status }}</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="action-btn edit" title="Edit" onclick='openEditBatchModal({{ b|tojson }})'><i class="fa-solid fa-pen"></i></button>
+              <button class="action-btn delete" title="Delete" onclick="confirmDelete('batches', {{ b.id }}, '{{ b.name|e }}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        <tr class="empty-row" style="display:none;"><td colspan="8">No batches match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="batchModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="batchModalTitle">Add Batch</h3>
+      <button class="modal-close" onclick="closeModal('batchModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="batchForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="full form-group">
+            <label>Batch Name</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Course</label>
+            <select name="course_id" class="form-control" required>
+              {% for c in courses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Trainer</label>
+            <select name="trainer_id" class="form-control" required>
+              {% for t in trainers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" name="start_date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>End Date</label>
+            <input type="date" name="end_date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Timing</label>
+            <input type="text" name="timing" class="form-control" placeholder="e.g. 6:00 PM - 8:00 PM" required>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status" class="form-control" required>
+              <option value="Upcoming">Upcoming</option>
+              <option value="Ongoing">Ongoing</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Capacity</label>
+            <input type="number" name="capacity" class="form-control" min="1" required>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('batchModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Batch</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var batchEditId = null;
+function openAddBatchModal(){
+  batchEditId = null;
+  document.getElementById('batchModalTitle').innerText = 'Add Batch';
+  document.getElementById('batchForm').reset();
+  openModal('batchModal');
+}
+function openEditBatchModal(batch){
+  batchEditId = batch.id;
+  document.getElementById('batchModalTitle').innerText = 'Edit Batch';
+  document.getElementById('batchForm').reset();
+  prefillForm('batchForm', batch);
+  openModal('batchModal');
+}
+if (new URLSearchParams(window.location.search).get('open') === 'add') { setTimeout(openAddBatchModal, 150); }
+document.getElementById('batchForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  submitEntityForm('batches', batchEditId ? 'PUT' : 'POST', this, batchEditId);
+});
+</script>
+{% endblock %}

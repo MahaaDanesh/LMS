@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Discussion Forum{% endblock %}
+{% block page_title %}Discussion Forum{% endblock %}
+{% block page_crumb %}Discuss doubts, ideas and learning topics{% endblock %}
+{% block content %}
+<div class="dash-grid"><div class="card"><div class="card-header"><h3><i class="fa-solid fa-comments"></i> Start a Discussion</h3></div><div class="card-body"><form method="post"><div class="form-group"><label>Topic</label><input class="form-control" name="title" required placeholder="Discussion title"></div><div class="form-group" style="margin-top:12px;"><label>Message</label><textarea class="form-control" name="message" rows="5" required placeholder="Write your question or idea..."></textarea></div><button class="btn btn-primary" style="margin-top:12px;"><i class="fa-solid fa-paper-plane"></i> Post Discussion</button></form></div></div><div class="card"><div class="card-header"><h3><i class="fa-solid fa-layer-group"></i> Recent Discussions</h3></div><div class="card-body"><div class="mini-list">{% for p in posts %}<div class="mini-item"><div class="mini-ic"><i class="fa-solid fa-message"></i></div><div><strong>{{p.title}}</strong><p>{{p.message}}</p><p><span class="badge badge-blue">{{p.role|title}}</span> <span class="cell-muted">{{p.author}} · {{p.date}}</span></p></div></div>{% else %}<p>No discussions yet.</p>{% endfor %}</div></div></div></div>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Trainer Salary Transactions{% endblock %}
+{% block page_title %}Trainer Salary Transactions{% endblock %}
+{% block page_crumb %}{% if session.get('user_role') == 'admin' %}Record trainer salary transactions{% else %}View your salary transaction history{% endif %}{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value">₹{{ '{:,.2f}'.format((salaries|selectattr('status','equalto','Paid')|map(attribute='salary_amount')|map('float')|sum)) }}</div>
+    <div class="stat-label">Total Paid</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ salaries|length }}</div>
+    <div class="stat-label">Salary Records</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ salaries|selectattr('status','equalto','Pending')|list|length }}</div>
+    <div class="stat-label">Pending</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-money-check-dollar"></i>&nbsp; Salary Payments <span class="badge badge-blue">{{ salaries|length }}</span></h3>
+    {% if session.get('user_role') == 'admin' %}
+    <button class="btn btn-primary" onclick="openAddSalaryModal()"><i class="fa-solid fa-money-check-dollar"></i> Record Salary</button>
+    <button class="btn btn-outline" onclick="openRazorpayXPayout()"><i class="fa-solid fa-building-columns"></i> Pay via RazorpayX</button>
+    {% endif %}
+  </div>
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search trainer or month..." data-search-for="salaryTable" oninput="applyFilters('salaryTable')">
+    </div>
+    <select class="filter-select" data-filter-for="salaryTable" data-field="status" onchange="applyFilters('salaryTable')">
+      <option value="">All Status</option>
+      <option value="Paid">Paid</option>
+      <option value="Pending">Pending</option>
+      <option value="Processing">Processing</option>
+      <option value="Failed">Failed</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="salaryTable">
+      <thead><tr><th>Trainer</th><th>Month</th><th>Salary</th><th>Paid Date</th><th>Method</th><th>Transaction ID</th><th>Status</th><th>Notes</th>{% if session.get('user_role')=='admin' %}<th>Actions</th>{% endif %}</tr></thead>
+      <tbody>
+      {% for s in salaries|sort(attribute='month', reverse=true) %}
+        <tr data-row data-id="{{ s.id }}" data-entity="salaries" data-status="{{ s.status }}">
+          <td class="cell-strong">{{ trainer_name(s.trainer_id) }}</td>
+          <td>{{ s.month }}</td>
+          <td>₹{{ '{:,.2f}'.format(s.salary_amount|float) }}</td>
+          <td>{{ s.paid_date or '—' }}</td>
+          <td>{{ s.payment_method or '—' }}</td>
+          <td>{{ s.transaction_id or '—' }}</td>
+          <td><span class="badge {{ 'badge-green' if s.status=='Paid' else 'badge-amber' if s.status=='Pending' else 'badge-gray' }}">{{ s.status }}</span></td>
+          <td>{{ s.notes or '—' }}</td>
+          {% if session.get('user_role')=='admin' %}
+          <td><div class="row-actions">
+            <button class="action-btn edit" title="Edit" onclick='openEditSalaryModal({{ s|tojson }})'><i class="fa-solid fa-pen"></i></button>
+            <button class="action-btn delete" title="Delete" onclick="confirmDelete('salaries', {{ s.id }}, 'salary for {{ trainer_name(s.trainer_id)|e }}')"><i class="fa-solid fa-trash"></i></button>
+          </div></td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="empty-state">No salary transactions yet. The institute admin can record the first trainer salary payment.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if session.get('user_role')=='admin' %}
+<div class="modal-overlay" id="salaryModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="salaryModalTitle">Record Trainer Salary Payment</h3>
+      <button class="modal-close" onclick="closeModal('salaryModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="salaryForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Trainer</label>
+            <select name="trainer_id" class="form-control" required>
+              <option value="">Select trainer</option>
+              {% for t in trainers %}<option value="{{ t.id }}">{{ t.name }} — {{ t.email }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Salary Month</label>
+            <input type="month" name="month" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Salary Amount (₹)</label>
+            <input type="number" name="salary_amount" class="form-control" min="0" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label>Paid Date</label>
+            <input type="date" name="paid_date" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select name="payment_method" class="form-control">
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="UPI">UPI</option>
+              <option value="Cash">Cash</option>
+              <option value="Cheque">Cheque</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Transaction ID / Reference</label>
+            <input name="transaction_id" class="form-control" placeholder="e.g. SAL-2026-0001">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status" class="form-control">
+              <option value="Paid">Paid</option>
+              <option value="Pending">Pending</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="full form-group">
+            <label>Notes</label>
+            <textarea name="notes" class="form-control" rows="3" placeholder="Optional salary note"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('salaryModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-money-check-dollar"></i> Record Salary Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div class="modal-overlay" id="razorpayxModal"><div class="modal-box"><div class="modal-header"><h3>RazorpayX Trainer Payout</h3><button class="modal-close" onclick="closeModal('razorpayxModal')"><i class="fa-solid fa-xmark"></i></button></div>
+<form id="razorpayxForm"><div class="modal-body"><div class="form-grid">
+<div class="full form-group"><label>Trainer</label><select name="trainer_id" class="form-control" required>{% for t in trainers %}<option value="{{ t.id }}" data-name="{{ t.name|e }}" data-email="{{ t.email|e }}" data-phone="{{ t.phone|e }}">{{ t.name }} — {{ t.email }}</option>{% endfor %}</select></div>
+<div class="form-group"><label>Salary Month</label><input type="month" name="month" class="form-control" required></div><div class="form-group"><label>Amount (₹)</label><input type="number" name="salary_amount" class="form-control" min="1" step="0.01" required></div>
+<div class="full form-group"><label>Account Holder Name</label><input name="account_holder" class="form-control" required></div><div class="full form-group"><label>Bank Account Number</label><input name="account_number" class="form-control" required autocomplete="off"></div>
+<div class="form-group"><label>IFSC Code</label><input name="ifsc" class="form-control" pattern="[A-Za-z]{4}0[A-Za-z0-9]{6}" required></div><div class="form-group"><label>10-digit Phone</label><input name="phone" class="form-control" pattern="[0-9]{10,}" required></div>
+<div class="full form-group"><label>Beneficiary Email</label><input type="email" name="email" class="form-control" required></div><div class="full"><small class="form-help">Requires active RazorpayX, a configured source account, and valid beneficiary bank details. Payout status updates from signed webhook events.</small></div>
+</div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('razorpayxModal')">Cancel</button><button type="submit" class="btn btn-primary">Initiate Payout</button></div></form></div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if session.get('user_role')=='admin' %}
+<script>
+var salaryEditId=null;
+function openAddSalaryModal(){
+  salaryEditId=null;
+  document.getElementById('salaryModalTitle').innerText='Record Trainer Salary Payment';
+  document.getElementById('salaryForm').reset();
+  openModal('salaryModal');
+}
+function openEditSalaryModal(s){
+  salaryEditId=s.id;
+  document.getElementById('salaryModalTitle').innerText='Edit Trainer Salary Transaction';
+  document.getElementById('salaryForm').reset();
+  prefillForm('salaryForm',s);
+  openModal('salaryModal');
+}
+document.getElementById('salaryForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  submitEntityForm('salaries',salaryEditId?'PUT':'POST',this,salaryEditId);
+});
+function openRazorpayXPayout(){const f=document.getElementById('razorpayxForm');f.reset();const trainer=f.elements.trainer_id.selectedOptions[0];if(trainer){f.elements.account_holder.value=trainer.dataset.name||'';f.elements.email.value=trainer.dataset.email||'';f.elements.phone.value=(trainer.dataset.phone||'').replace(/\D/g,'');}openModal('razorpayxModal');}
+document.getElementById('razorpayxForm').addEventListener('submit',async function(e){e.preventDefault();const data=Object.fromEntries(new FormData(this).entries());const btn=this.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Initiating…';try{const r=await fetch('/api/salaries/razorpayx-payout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const d=await r.json();if(!r.ok){alert(d.error||'Payout failed');return;}alert('Payout initiated: '+d.payout_id+' ('+d.status+'). Refreshing salary history.');location.reload();}catch(err){alert('Could not reach the server.');}finally{btn.disabled=false;btn.textContent='Initiate Payout';}});
+</script>
+{% endif %}
+{% endblock %}

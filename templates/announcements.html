@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Announcements{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+{% block page_crumb %}Create and broadcast announcements to students and trainers{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fa-solid fa-bullhorn"></i>&nbsp; All Announcements <span class="badge badge-blue">{{ announcements|length }}</span></h3>
+    {% if session.get('user_role') in ['admin','trainer'] %}<div class="page-actions">
+      <button class="btn btn-primary" onclick="openAddAnnouncementModal()"><i class="fa-solid fa-plus"></i> New Announcement</button>
+    </div>{% endif %}
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass" style="color:var(--gray-500)"></i>
+      <input type="text" placeholder="Search announcements..." data-search-for="announcementsTable" oninput="applyFilters('announcementsTable')">
+    </div>
+    <select class="filter-select" data-filter-for="announcementsTable" data-field="audience" onchange="applyFilters('announcementsTable')">
+      <option value="">All Audience</option>
+      <option value="All">All</option>
+      <option value="Students">Students</option>
+      <option value="Trainers">Trainers</option>
+    </select>
+
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table" id="announcementsTable">
+      <thead>
+        <tr><th>Title</th><th>Message</th><th>Audience</th><th>Date</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for a in announcements %}
+        <tr data-row data-id="{{ a.id }}" data-entity="announcements" data-audience="{{ a.audience }}">
+          <td class="cell-strong">{{ a.title }}</td>
+          <td class="cell-muted" style="max-width:320px;">{{ a.message }}</td>
+          <td><span class="badge badge-blue">{{ a.audience }}</span></td>
+          
+          <td>{{ a.date }}</td>
+          <td>{% if session.get('user_role') in ['admin','trainer'] %}
+            <div class="row-actions">
+              <button class="action-btn edit" title="Edit" onclick='openEditAnnouncementModal({{ a|tojson }})'><i class="fa-solid fa-pen"></i></button>
+              <button class="action-btn delete" title="Delete" onclick="confirmDelete('announcements', {{ a.id }}, '{{ a.title|e }}')"><i class="fa-solid fa-trash"></i></button>
+            </div>{% else %}<span class="cell-muted">View only</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        <tr class="empty-row" style="display:none;"><td colspan="6">No announcements match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <div class="card-header"><h3><i class="fa-solid fa-folder-open"></i>&nbsp; Materials <span class="badge badge-blue">{{ materials|length }}</span></h3>
+  {% if session.get('user_role') in ['admin','trainer'] %}<button class="btn btn-primary" onclick="openAddMaterialModal()"><i class="fa-solid fa-plus"></i> Add Material</button>{% endif %}</div>
+  <div class="table-wrap"><table class="data-table"><thead><tr><th>Material</th><th>Description</th><th>Course</th><th>Type</th><th>Date</th><th>Uploaded By</th><th>View</th>{% if session.get('user_role') in ['admin','trainer'] %}<th>Actions</th>{% endif %}</tr></thead><tbody>
+  {% for m in materials %}<tr><td class="cell-strong">{{ m.title }}</td><td>{{ m.description }}</td><td>{{ course_name(m.course_id) }}</td><td><span class="badge badge-blue">{{ m.type }}</span></td><td>{{ m.date }}</td><td>{{ m.uploaded_by }}</td><td>{% if m.url %}<a class="btn btn-outline btn-sm" href="{{ m.url }}" target="_blank" rel="noopener">View</a>{% else %}<span class="cell-muted">Not added</span>{% endif %}</td>{% if session.get('user_role') in ['admin','trainer'] %}<td><div class="row-actions"><button class="action-btn delete" onclick="confirmDelete('materials',{{m.id}},'{{m.title|e}}')"><i class="fa-solid fa-trash"></i></button></div></td>{% endif %}</tr>{% else %}<tr><td colspan="8">No materials available.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+
+<div class="modal-overlay" id="materialModal"><div class="modal-box"><div class="modal-header"><h3>Add Material</h3><button class="modal-close" onclick="closeModal('materialModal')"><i class="fa-solid fa-xmark"></i></button></div><form id="materialForm"><div class="modal-body"><div class="form-grid"><div class="full form-group"><label>Title</label><input name="title" class="form-control" required></div><div class="full form-group"><label>Description</label><textarea name="description" class="form-control" required></textarea></div><div class="form-group"><label>Course</label><select name="course_id" class="form-control">{% for c in courses %}<option value="{{c.id}}">{{c.name}}</option>{% endfor %}</select></div><div class="form-group"><label>Batch</label><select name="batch_id" class="form-control">{% for b in batches %}<option value="{{b.id}}">{{b.name}}</option>{% endfor %}</select></div><div class="form-group"><label>Type</label><input name="type" class="form-control" placeholder="PDF / Document / Link" required></div><div class="form-group"><label>URL</label><input name="url" class="form-control" placeholder="Google Drive / OneDrive / material link"></div><div class="form-group"><label>Date</label><input type="date" name="date" class="form-control" required></div><input type="hidden" name="uploaded_by" value="{{session.get('user_name')}}"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal('materialModal')">Cancel</button><button class="btn btn-primary">Save Material</button></div></form></div></div>
+
+<div class="modal-overlay" id="announcementModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="announcementModalTitle">New Announcement</h3>
+      <button class="modal-close" onclick="closeModal('announcementModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="announcementForm">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="full form-group">
+            <label>Title</label>
+            <input type="text" name="title" class="form-control" required>
+          </div>
+          <div class="full form-group">
+            <label>Message</label>
+            <textarea name="message" class="form-control" rows="3" required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Audience</label>
+            <select name="audience" class="form-control" required>
+              <option value="All">All</option>
+              <option value="Students">Students</option>
+              <option value="Trainers">Trainers</option>
+            </select>
+          </div>
+
+          <div class="full form-group">
+            <label>Date</label>
+            <input type="date" name="date" class="form-control" required>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('announcementModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Publish</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddMaterialModal(){document.getElementById('materialForm').reset();openModal('materialModal');}
+document.getElementById('materialForm').addEventListener('submit',function(e){e.preventDefault();submitEntityForm('materials','POST',this,null);});
+var announcementEditId = null;
+function openAddAnnouncementModal(){
+  announcementEditId = null;
+  document.getElementById('announcementModalTitle').innerText = 'New Announcement';
+  document.getElementById('announcementForm').reset();
+  openModal('announcementModal');
+}
+function openEditAnnouncementModal(a){
+  announcementEditId = a.id;
+  document.getElementById('announcementModalTitle').innerText = 'Edit Announcement';
+  document.getElementById('announcementForm').reset();
+  prefillForm('announcementForm', a);
+  openModal('announcementModal');
+}
+document.getElementById('announcementForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  submitEntityForm('announcements', announcementEditId ? 'PUT' : 'POST', this, announcementEditId);
+});
+if(new URLSearchParams(location.search).get('open')==='add'){setTimeout(openAddAnnouncementModal,150);}
+</script>
+{% endblock %}
